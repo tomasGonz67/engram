@@ -39,3 +39,15 @@ Backend framework. Handles API routes, background jobs, and orchestrates communi
 
 ### Libraries
 
+#### sentence-transformers
+Loads and runs embedding models locally. Acts as the encoding layer — converts raw text into a vector, the form in which it's stored. Similar to how the brain encodes an experience into a neural representation that is consolidated into a memory.
+
+**Model (dev):** `Qwen/Qwen3-Embedding-0.6B` — 64.33 MTEB score, ~1.5GB RAM, **1024 dimensions**
+**Model (prod):** TBD — evaluating open source (Qwen3-Embedding-4B/8B) vs API options based on scale and cost
+
+**Why Qwen3-Embedding-0.6B for dev:**
+- 8 points higher than all-MiniLM-L6-v2 (64 vs 56 MTEB) — meaningfully better retrieval quality
+- Small enough to run comfortably in Docker on a dev machine
+
+**Loaded once on startup and kept in memory.** The model is stateless during inference — weights do not change between requests. Since embedding is a core dependency in store and retrieve operations, the model is typically loaded once and kept resident in memory. This avoids model reload overhead, so each request only incurs inference compute cost plus standard system overhead such as tokenization, request scheduling, and I/O. This is standard practice for embedding services in production systems regardless of model size.
+

@@ -1,7 +1,11 @@
 from fastapi import FastAPI
+from sentence_transformers import SentenceTransformer
 
 app = FastAPI()
 
-@app.get("/helloworld")
-def hello_world():
-    return {"message": "Hello World"}
+model = SentenceTransformer("Qwen/Qwen3-Embedding-0.6B")
+
+@app.get("/")
+def embed(text: str = "hello world"):
+    vector = model.encode(text)
+    return {"text": text, "vector": vector.tolist()}

@@ -1,10 +1,12 @@
 services:
   backend:
     build: ./backend
+    image: engram-be:dev
     ports:
       - "8000:8000"
     volumes:
       - ./backend:/app
+      - hf_cache:/root/.cache/huggingface
     depends_on:
       - qdrant
       - postgres
@@ -30,3 +32,4 @@ services:
 volumes:
   qdrant_data:
   postgres_data:
+  hf_cache:
