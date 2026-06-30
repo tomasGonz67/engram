@@ -1,0 +1,11 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.env
+
+# Docker
+volumes/
+
+# OS
+.DS_Store
