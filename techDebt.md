@@ -2,6 +2,7 @@
 
 ## Open
 
+- **Public repo exposes schema docs** — `dataModel.md` and `techStack.md` document internal DB structure. Acceptable for a dev/portfolio project with no real users. Revisit if this becomes a real product.
 - **No services layer** — business logic currently lives in route handlers. When operations grow complex (e.g. store memory = embed + write to Qdrant + write to Postgres), extract into a services layer (e.g. `memory_service.store()`) to keep routers thin.
 
 - **No `start.sh` script** — collection creation and any future startup logic runs inline on app start. If startup complexity grows (migrations, health checks, seed data), consolidate into a `start.sh` script.
