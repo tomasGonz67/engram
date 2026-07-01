@@ -29,9 +29,19 @@ Qdrant handles semantic search — returns IDs of the most similar vectors. Post
 
 ## API (current)
 
+**Store response** `POST /memories`
+
 | Field | Description |
 |-------|-------------|
-| `id` | UUID returned on store |
-| `text` | Original text returned on store |
+| `id` | UUID of the stored memory |
+| `text` | Original text |
 
-Response models will expand as Postgres is added.
+**Search response** `POST /memories/search`
+
+| Field | Description |
+|-------|-------------|
+| `id` | UUID of the matched memory |
+| `text` | Original text of the matched memory |
+| `score` | Cosine similarity score (0.0 - 1.0). Higher = more similar to query |
+
+Response models will expand as Postgres metadata is added.
