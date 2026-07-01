@@ -37,6 +37,19 @@ Backend framework. Handles API routes, background jobs, and orchestrates communi
 - Auto-generates API docs at `/docs`
 - Standard for Python AI/ML projects
 
+### Architectural Pattern
+
+Layered architecture mapped to MVC:
+
+- **Model** — split across two files:
+  - `models.py` — data shapes. Defines what request/response data looks like using Pydantic. No logic, no DB, just structure.
+  - `database.py` — data access. Holds the Qdrant client, embedding model, and constants. Reads all connection info from environment variables — no hardcoded credentials.
+- **View** — none yet. Would be React if a frontend is added.
+- **Controller** — `routers/` — handles requests, uses database.py to do the work, returns responses. Each file in routers is a resource (memories, etc.)
+- **App entry point** — `main.py` — app setup, lifespan, router registration. No business logic.
+
+Concerns are separated by responsibility. Structure expands as complexity justifies it — not prematurely.
+
 ### Libraries
 
 #### sentence-transformers

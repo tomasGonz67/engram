@@ -6,6 +6,7 @@ __pycache__/
 
 # Docker
 volumes/
+docker-compose.yml
 
 # OS
 .DS_Store
