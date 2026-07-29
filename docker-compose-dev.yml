@@ -8,6 +8,7 @@ services:
       - ./backend:/app
       - hf_cache:/root/.cache/huggingface
     environment:
+      ENVIRONMENT: development
       QDRANT_HOST: qdrant
       QDRANT_PORT: 6333
       POSTGRES_HOST: postgres

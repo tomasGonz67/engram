@@ -14,7 +14,9 @@ Engram is not intended to simulate the brain exactly. Instead, it adapts well-es
 
 ## Core Memory Principles
 
-- **Decay** — memory strength decreases over time if not accessed or reinforced
-- **Reinforcement** — retrieval and reuse strengthen memory strength
+- **Decay** — a memory's retrievability decreases over time if not reinforced
+- **Reinforcement** — a memory is only strengthened by confirmed, meaningful use — not merely by being returned in a search. Being shown and being used are tracked separately so popular results don't self-reinforce just from exposure
 - **Consolidation** — periodic processes prune weak memories, merge duplicates, and stabilize important ones
-- **Weighted Retrieval** — memory ranking combines semantic similarity, strength, recency, and access frequency
+- **Weighted Retrieval** — memory ranking combines semantic similarity, retrievability (which itself accounts for strength and recency), and how often a memory has actually been used
+
+See `architecture.md` for the full formulas and reasoning behind each principle.

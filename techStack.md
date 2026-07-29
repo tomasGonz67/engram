@@ -16,12 +16,12 @@ Vector database. Stores and searches memory vectors by semantic similarity. Acts
 ---
 
 ## PostgreSQL
-Relational database. Stores all engram metadata — strength, stability, timestamps, access count, memory type. Acts as the other half of every engram — Qdrant holds the meaning, Postgres holds the details. Together they form one complete memory.
+Relational database. Stores all engram metadata — `impact`, `stability`, `retrieval_count`/`use_count`, timestamps, memory type. There is no stored "strength" column; retrievability is computed lazily from `stability` and elapsed time, never written to the DB — see `architecture.md`. Acts as the other half of every engram — Qdrant holds the meaning, Postgres holds the details. Together they form one complete memory.
 
 **Why Postgres:**
 - Schema is fixed — every engram has the same fields, no flexibility needed
-- Scheduled jobs need aggregate SQL queries — `UPDATE WHERE strength < 0.2` is natural SQL
-- ACID compliance — transaction guarantees when decay updates thousands of records at once
+- Consolidation (pruning weak memories) needs aggregate SQL queries over `stability`/`last_reinforced_at` — natural fit for SQL, not a document store
+- ACID compliance — transaction guarantees when Consolidation updates many records at once
 - Better for relational data — if users are added later, foreign keys handle it cleanly
 
 **Why both Qdrant and Postgres:**
@@ -38,6 +38,12 @@ Backend framework. Handles API routes, background jobs, and orchestrates communi
 - Standard for Python AI/ML projects
 
 ### Libraries
+
+#### psycopg2-binary
+PostgreSQL driver for Python. Used to connect to Postgres, create tables on startup, and execute queries.
+
+#### torch (CPU-only)
+PyTorch is a dependency of sentence-transformers. Using the CPU-only build (`--extra-index-url https://download.pytorch.org/whl/cpu`) keeps the Docker image at ~2.4GB vs ~14.5GB for the full CUDA build. No GPU acceleration in dev — acceptable since inference runs fast enough on CPU for a single-user project. Switch to full PyTorch if deploying on a GPU instance.
 
 #### sentence-transformers
 Loads and runs embedding models locally. Acts as the encoding layer — converts raw text into a vector, the form in which it's stored. Similar to how the brain encodes an experience into a neural representation that is consolidated into a memory.

@@ -21,3 +21,7 @@ docker compose -f docker-compose-dev.yml up -d
 ```bash
 docker compose -f docker-compose-dev.yml down
 ```
+
+## Scripts
+
+See `scripts.md` for utility scripts (`scripts/clear.sh`, etc.).
