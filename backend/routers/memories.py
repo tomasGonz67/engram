@@ -3,7 +3,8 @@ from fastapi import APIRouter
 from qdrant_client.models import PointStruct
 from models import MemoryInput, SearchInput
 from database import model, qdrant, COLLECTION_NAME, insert_memory, get_memories_metadata
-from constants import BASE_STABILITY, MIN_IMPACT, MAX_IMPACT, CANDIDATE_POOL_SIZE
+from constants import CANDIDATE_POOL_SIZE
+from formulas import clamp_impact, compute_initial_stability
 
 router = APIRouter()
 
@@ -19,8 +20,8 @@ def store(body: MemoryInput):
     )
 
     # Business logic: clamp impact, compute initial stability
-    impact = max(MIN_IMPACT, min(body.impact, MAX_IMPACT))
-    stability = BASE_STABILITY * impact
+    impact = clamp_impact(body.impact)
+    stability = compute_initial_stability(impact)
 
     # Store metadata in Postgres
     insert_memory(id, body.text, impact, stability)

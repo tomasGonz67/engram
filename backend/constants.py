@@ -11,3 +11,6 @@ MAX_IMPACT = 2.0
 
 # Search / ranking
 CANDIDATE_POOL_SIZE = 50  # candidates fetched from Qdrant before re-ranking down to the caller's limit
+SEMANTIC_WEIGHT = 0.75
+RETRIEVABILITY_WEIGHT = 0.15
+FREQUENCY_WEIGHT = 0.10

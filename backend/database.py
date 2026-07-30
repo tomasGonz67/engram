@@ -30,8 +30,8 @@ CREATE TABLE IF NOT EXISTS memories (
     stability FLOAT DEFAULT 1.0,
     retrieval_count INT DEFAULT 0,
     use_count INT DEFAULT 0,
-    created_at TIMESTAMP DEFAULT NOW(),
-    last_reinforced_at TIMESTAMP DEFAULT NOW(),
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    last_reinforced_at TIMESTAMPTZ DEFAULT NOW(),
     memory_type VARCHAR(50) DEFAULT 'general'
 );
 """
