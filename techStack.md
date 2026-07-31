@@ -57,3 +57,28 @@ Loads and runs embedding models locally. Acts as the encoding layer — converts
 
 **Loaded once on startup and kept in memory.** The model is stateless during inference — weights do not change between requests. Since embedding is a core dependency in store and retrieve operations, the model is typically loaded once and kept resident in memory. This avoids model reload overhead, so each request only incurs inference compute cost plus standard system overhead such as tokenization, request scheduling, and I/O. This is standard practice for embedding services in production systems regardless of model size.
 
+---
+
+## OpenAI API (Generation)
+External LLM API. Handles the "AG" (generation) half of RAG — takes the query, whatever `search()` retrieves, and a small window of recent conversation turns, and produces the actual answer. Also the tool-calling boundary: exposes `reinforce_memory` as a callable tool so the model can mark a memory as meaningfully used, per `architecture.md`'s "On meaningful use" distinction.
+
+**Model:** `gpt-5.4-nano`
+
+**Why GPT-5.4 Nano:**
+- Cheapest of the models evaluated — $0.20 / $1.25 per M tokens (input/output), vs GPT-5 mini's $0.25 / $2.00 and GPT-5.4 Mini's $0.75 / $4.50
+- Tool-calling reliability matches or beats the pricier GPT-5.4 Mini tier (57.7% vs 56.1% on MCP Atlas) — the only capability that actually matters here, since `reinforce_memory` is the sole tool exposed
+- GPT-5.4 Mini's edge over Nano is computer-use and tool search, neither relevant to a single-tool workflow
+- Current generation (released March 2026) — unlike Gemini 2.5 Flash Lite, which was ruled out for being scheduled for shutdown October 16, 2026
+
+**Why an API instead of self-hosting:**
+- Usable generation quality needs GPU compute; DigitalOcean GPU droplets run ~$2.50–$6.74/hr even sitting idle, versus pay-per-token pricing — at this project's low, sporadic query volume, self-hosting would cost far more than it saves
+- Unlike the embedding model (small, called on every store *and* search, cheap enough for CPU), generation runs far less often and needs a much bigger model to produce good output — the "already-paid-for idle CPU" argument that justifies self-hosting embeddings doesn't hold here
+
+**Alternatives considered:**
+- Claude Haiku 4.5 — priciest candidate on both input and output, no offsetting reliability edge for this use case
+- Llama 3.3 70B / Llama-3-Groq-70B-Tool-Use (Groq) — legitimate contender, strong published BFCL tool-calling score and cheap output pricing, but Nano beat it on cost without giving anything up
+- Gemini 2.5 Flash Lite — cheapest raw pricing, but ruled out over the Oct 2026 shutdown
+- GPT-5 mini (previous OpenAI generation) — superseded by GPT-5.4 Nano on both cost and tool-calling
+
+**Statelessness:** like every LLM chat API, each call is independent — nothing is retained between requests. Engram reconstructs the relevant context (system prompt + retrieved memories + a small bounded window of recent turns) and resends it in full on every generation call. This is exactly why the Qdrant/Postgres layer exists as a separate system — the LLM itself has no persistent memory to lean on.
+
