@@ -90,6 +90,23 @@ MEMORIES = [
     "Cooked a big Sunday dinner for the family",
     "Started training for a half marathon",
 
+    # Games / entertainment (15)
+    "Met my girlfriend playing Toontown years ago",
+    "Played Roblox with my girlfriend for hours today",
+    "My girlfriend and I started a new true crime series on Netflix",
+    "Watched police body cam videos on YouTube with my girlfriend tonight",
+    "Logged into Toontown again just to relive where I met my girlfriend",
+    "My girlfriend and I finished an entire true crime documentary in one sitting",
+    "Played a new Roblox game my girlfriend found",
+    "Fell down a YouTube rabbit hole of body cam footage with my girlfriend",
+    "My girlfriend and I picked a new true crime show to binge",
+    "Spent the evening playing Roblox with my girlfriend instead of sleeping",
+    "Watched a wild police chase compilation on YouTube with my girlfriend",
+    "My girlfriend found an old Toontown screenshot and it brought back memories",
+    "Stayed up late watching true crime with my girlfriend again",
+    "My girlfriend and I built something new in Roblox together",
+    "Watched a body cam video that turned into a two hour YouTube spiral with my girlfriend",
+
     # Misc / edge cases (5)
     "Got a flat tire on the way to work this morning",
     "My flight got delayed by four hours at the airport",
