@@ -57,6 +57,8 @@ Qdrant handles semantic search — returns IDs of the most similar vectors. Post
 
 This is a deliberately verbose response — kept as separate fields rather than collapsing to a single `score` so each signal can be inspected/verified independently. May collapse to just `{id, text, score}` later once the formula (particularly `SEMANTIC_THRESHOLD`, still an unvalidated placeholder — see `constants.py`) is trusted enough not to need per-request visibility into its components.
 
+**If nothing survives filtering, the response is a different shape**: `{"message": "No valid memories found"}` instead of an array. A deliberate exception to "the response type should always be the same" — chosen so there's no need to fake a memory-shaped placeholder object (a fake `id` or an out-of-bounds `final_score` like `100`, both considered and rejected) just to keep the shape uniform. Any caller of this endpoint needs to handle both an array and this object.
+
 `retrieval_count` bookkeeping (incrementing it for whatever search returns) is **not yet implemented** — despite being conceptually part of search, not reinforcement.
 
 **Reinforce (mark as meaningfully used)** `POST /memories/{id}/use` — not yet implemented

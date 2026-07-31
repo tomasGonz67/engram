@@ -15,8 +15,10 @@ SEMANTIC_WEIGHT = 0.75
 RETRIEVABILITY_WEIGHT = 0.15
 FREQUENCY_WEIGHT = 0.10
 
-# UNVALIDATED PLACEHOLDER — a working hypothesis based on exactly two manual
-# test examples (one relevant match normalizing to 0.834, one irrelevant
-# match normalizing to 0.614), not a calibrated value. Revisit once there's
-# real usage data to check it against. See architecture.md.
-SEMANTIC_THRESHOLD = 0.7
+# STILL A PLACEHOLDER, but better calibrated than before — a genuine nonsense
+# query ("asdkjf qwoeiru zzxcvbn blorp glorp nonsense gibberish") scored
+# 0.716-0.768 against a 60-memory seeded dataset, all of it wrongly passing
+# the old 0.7 threshold. Known-relevant matches have all scored 0.834+.
+# 0.8 sits between those two ranges. Still not a large validated dataset —
+# revisit once there's real usage data. See architecture.md.
+SEMANTIC_THRESHOLD = 0.8

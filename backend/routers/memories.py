@@ -81,4 +81,7 @@ def search(body: SearchInput):
 
     ranked.sort(key=lambda r: r["final_score"], reverse=True)
 
+    if not ranked:
+        return {"message": "No valid memories found"}
+
     return ranked[:body.limit]
