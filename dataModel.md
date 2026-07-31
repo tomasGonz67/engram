@@ -44,18 +44,20 @@ Qdrant handles semantic search — returns IDs of the most similar vectors. Post
 | `id` | UUID of the stored memory |
 | `text` | Original text |
 
-**Search response** `POST /memories/search` — **temporary shape, not final.** Re-ranking (`retrievability`, `frequency`, the weighted `final_score` formula in `architecture.md`) isn't implemented yet. Right now this endpoint fetches a wide candidate pool from Qdrant and joins each result with its raw Postgres metadata, still ordered by raw semantic similarity:
+**Search response** `POST /memories/search` — full weighted ranking is implemented. Fetches a wide candidate pool from Qdrant, normalizes and semantic-threshold-filters it, discards any candidate with no matching Postgres row (can't compute retrievability/frequency without `stability`/`use_count`), computes all three ranking signals for what's left, and returns the top `limit` sorted by `final_score` descending:
 
 | Field | Description |
 |-------|-------------|
 | `id` | UUID of the matched memory |
 | `text` | Original text of the matched memory |
-| `semantic_score` | Raw Qdrant cosine similarity — not yet combined with any other signal |
-| `metadata` | Raw `stability`/`use_count`/`last_reinforced_at` for this memory, unprocessed. `null` if a Qdrant vector has no matching Postgres row (an orphaned record — see `scripts.md`'s `clear.sh`) |
+| `semantic` | Normalized Qdrant cosine similarity (`architecture.md`'s `normalize_qdrant_similarity`) |
+| `retrievability` | `(1 + age_days / stability)^-0.5`, computed from this memory's `stability` and time since `last_reinforced_at` |
+| `frequency` | `1 - exp(-use_count / 5)` |
+| `final_score` | `0.75×semantic + 0.15×retrievability + 0.10×frequency` — what results are actually sorted by |
 
-This will be replaced once the weighted-ranking formula is implemented — expect `semantic_score` and `metadata` to collapse into a single `score` field, per `architecture.md`.
+This is a deliberately verbose response — kept as separate fields rather than collapsing to a single `score` so each signal can be inspected/verified independently. May collapse to just `{id, text, score}` later once the formula (particularly `SEMANTIC_THRESHOLD`, still an unvalidated placeholder — see `constants.py`) is trusted enough not to need per-request visibility into its components.
 
-`retrieval_count` bookkeeping (incrementing it for whatever search returns) is **not yet implemented** either — despite being conceptually part of search, not reinforcement.
+`retrieval_count` bookkeeping (incrementing it for whatever search returns) is **not yet implemented** — despite being conceptually part of search, not reinforcement.
 
 **Reinforce (mark as meaningfully used)** `POST /memories/{id}/use` — not yet implemented
 

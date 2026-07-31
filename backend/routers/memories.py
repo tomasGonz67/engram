@@ -3,8 +3,16 @@ from fastapi import APIRouter
 from qdrant_client.models import PointStruct
 from models import MemoryInput, SearchInput
 from database import model, qdrant, COLLECTION_NAME, insert_memory, get_memories_metadata
-from constants import CANDIDATE_POOL_SIZE
-from formulas import clamp_impact, compute_initial_stability
+from constants import CANDIDATE_POOL_SIZE, SEMANTIC_THRESHOLD
+from formulas import (
+    clamp_impact,
+    compute_initial_stability,
+    normalize_qdrant_similarity,
+    compute_age_days,
+    compute_retrievability,
+    compute_frequency,
+    compute_final_score,
+)
 
 router = APIRouter()
 
@@ -40,15 +48,37 @@ def search(body: SearchInput):
     ids = [str(r.id) for r in results]
     metadata = get_memories_metadata(ids)
 
-    # Temporary: re-ranking (retrievability, frequency, weighted score) isn't
-    # implemented yet — this just proves the metadata is being fetched correctly.
-    # Still returns only body.limit results, but from a much wider candidate pool.
-    return [
-        {
-            "id": r.id,
-            "text": r.payload["text"],
-            "semantic_score": r.score,
-            "metadata": metadata.get(str(r.id))
-        }
-        for r in results[:body.limit]
+    # Normalize semantic scores, then discard anything below the (currently
+    # unvalidated) semantic threshold before it ever reaches ranking — see
+    # constants.py and architecture.md.
+    candidates = [
+        {"result": r, "semantic": normalize_qdrant_similarity(r.score)}
+        for r in results
     ]
+    candidates = [c for c in candidates if c["semantic"] >= SEMANTIC_THRESHOLD]
+
+    # Only candidates with a matching Postgres row can be ranked — there's no
+    # stability/use_count/last_reinforced_at to compute retrievability or
+    # frequency from otherwise (an orphaned Qdrant vector, e.g. from a
+    # partial write failure — see architecture.md).
+    ranked = []
+    for c in candidates:
+        meta = metadata.get(str(c["result"].id))
+        if meta is None:
+            continue
+        age_days = compute_age_days(meta["last_reinforced_at"])
+        retrievability = compute_retrievability(meta["stability"], age_days)
+        frequency = compute_frequency(meta["use_count"])
+        final_score = compute_final_score(c["semantic"], retrievability, frequency)
+        ranked.append({
+            "id": c["result"].id,
+            "text": c["result"].payload["text"],
+            "semantic": c["semantic"],
+            "retrievability": retrievability,
+            "frequency": frequency,
+            "final_score": final_score,
+        })
+
+    ranked.sort(key=lambda r: r["final_score"], reverse=True)
+
+    return ranked[:body.limit]

@@ -7,7 +7,7 @@ Memory retrieval is a two-stage process:
 **Stage 1 — Semantic Search (Qdrant)**
 The query is embedded into a vector using the same model used to store memories. Qdrant finds the top N most semantically similar vectors using cosine similarity. Fast, pure vector math.
 
-**Stage 2 — Re-ranking (Postgres)** — *target design; not yet implemented. `search()` currently fetches the wide candidate pool and joins raw metadata but doesn't compute or apply this formula yet — see `dataModel.md`'s API section for what it actually returns today.*
+**Stage 2 — Re-ranking (Postgres)** — *implemented. See `dataModel.md`'s API section for the exact current response shape (kept as separate `semantic`/`retrievability`/`frequency`/`final_score` fields rather than collapsed to one `score`, for now).*
 The N candidate IDs from Qdrant are used to fetch metadata from Postgres — `stability`, `use_count`, `last_reinforced_at`. A weighted formula re-ranks the candidates:
 
 ```
@@ -19,7 +19,9 @@ discard candidates where semantic < semantic_threshold   // hard floor, calibrat
 final_score = 0.75×semantic + 0.15×retrievability + 0.10×frequency
 ```
 
-This is a weighted **sum**, not a product — deliberately, so that a weak signal on one term (e.g. a brand-new memory with `use_count = 0`) can't zero out the whole score the way a product would. Semantic similarity dominates (75%) so an irrelevant memory can't win purely by being old or heavily used; the semantic threshold is an additional hard floor on top of that weighting, applied before re-ranking.
+`normalize_qdrant_similarity(raw_similarity)` is `(raw_similarity + 1) / 2` — cosine similarity is mathematically bounded to `[-1, 1]`, not `[0, 1]`, but `final_score`'s weighting assumes all three terms share the same `[0, 1]` scale (which `retrievability` and `frequency` already do, by construction). Without this rescale, a negative raw score would pull `final_score` down in a way the other two terms never do, breaking the intended proportions.
+
+This is a weighted **sum**, not a product — deliberately, so that a weak signal on one term (e.g. a brand-new memory with `use_count = 0`) can't zero out the whole score the way a product would. Semantic similarity dominates (75%) so an irrelevant memory can't win purely by being old or heavily used; the semantic threshold is an additional hard floor on top of that weighting, applied before re-ranking. `SEMANTIC_THRESHOLD` (`constants.py`) is currently an **unvalidated placeholder (0.7)** — a working hypothesis based on two manual test examples, not a calibrated value. It's already been shown to let at least one irrelevant memory through (normalized to 0.711) — expected and acceptable for a placeholder, but a reminder this needs real tuning once there's actual usage data, not blind trust.
 
 N is intentionally larger than the number of results returned. Fetch top 50 from Qdrant, filter by the semantic threshold, re-rank, return top 5. This gives the re-ranking enough candidates to work with.
 
@@ -52,6 +54,8 @@ retrievability = (1 + age_days / stability)^(-0.5)
 ```
 Important: `stability` is **not** a half-life. At `age_days = stability`, retrievability is ~70.7%, not 50%. The actual half-life is `3 × stability`. Computing this on the fly (rather than a stored, periodically-updated `strength` column) means it's always exact and needs no background decay job.
 
+`compute_retrievability` raises `ValueError` if `stability <= 0` rather than letting the calculation proceed — Python's `**` on a negative base with a fractional exponent silently returns a complex number instead of erroring, which would otherwise corrupt `final_score` without any visible failure at the point something actually went wrong. `compute_initial_stability` also clamps its own input internally now, so it can't produce an invalid `stability` regardless of whether the caller already validated `impact`.
+
 **On search — a memory is returned as a result**
 ```
 retrieval_count += 1
@@ -80,8 +84,9 @@ Layered architecture mapped to MVC:
   - `models.py` — data shapes. Defines what request/response data looks like using Pydantic. No logic, no DB, just structure.
   - `database.py` — data access. Holds the Qdrant client, embedding model, and the Postgres connection helper. Plain functions that take already-finished values and read/write them — no business logic, no clamping, no derived-value computation. Reads all connection info from environment variables — no hardcoded credentials.
 - **View** — none yet. Would be React if a frontend is added.
-- **Controller** — `routers/` — owns business logic (validation, clamping incoming values, computing derived values like `stability`), then calls `database.py` purely for reads/writes with the values it already computed. Returns responses. Each file in routers is a resource (memories, etc.)
+- **Controller** — `routers/` — owns business logic (validation, orchestration, deciding what needs to happen for a request), then calls `formulas.py` for calculations and `database.py` purely for reads/writes with the values it already computed. Returns responses. Each file in routers is a resource (memories, etc.)
 - **App entry point** — `main.py` — app setup, lifespan, router registration. No business logic.
-- **Constants** — `constants.py` — shared, tunable memory-lifecycle values (see below), imported by whichever business logic in `routers/` needs them. Not part of the MVC split itself, just a single source of truth so tuning values live in one place instead of scattered across route handlers.
+- **Formulas** — `formulas.py` — every calculation from this doc (impact clamping, stability, retrievability, frequency, semantic normalization, final score) as pure, independently testable functions. Not part of the MVC split itself — routers call into it rather than computing things inline, so the same math can't drift between call sites (e.g. Consolidation will need `compute_retrievability` too, once built).
+- **Constants** — `constants.py` — shared, tunable values (see below). Imported by `formulas.py` (most of them) and directly by `routers/` for the few that are orchestration parameters rather than formula inputs (e.g. `CANDIDATE_POOL_SIZE`). Not part of the MVC split itself, just a single source of truth so tuning values live in one place instead of scattered across the codebase.
 
 Concerns are separated by responsibility. Structure expands as complexity justifies it — not prematurely.

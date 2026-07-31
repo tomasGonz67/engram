@@ -14,3 +14,9 @@ CANDIDATE_POOL_SIZE = 50  # candidates fetched from Qdrant before re-ranking dow
 SEMANTIC_WEIGHT = 0.75
 RETRIEVABILITY_WEIGHT = 0.15
 FREQUENCY_WEIGHT = 0.10
+
+# UNVALIDATED PLACEHOLDER — a working hypothesis based on exactly two manual
+# test examples (one relevant match normalizing to 0.834, one irrelevant
+# match normalizing to 0.614), not a calibrated value. Revisit once there's
+# real usage data to check it against. See architecture.md.
+SEMANTIC_THRESHOLD = 0.7

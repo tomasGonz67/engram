@@ -63,6 +63,14 @@ def compute_frequency(use_count: int) -> float:
     return 1 - math.exp(-use_count / 5)
 
 
+def normalize_qdrant_similarity(raw_similarity: float) -> float:
+    """Rescale cosine similarity from its mathematical range [-1, 1] to
+    [0, 1], so it's on the same scale as retrievability and frequency going
+    into compute_final_score's weighted sum. See architecture.md's "How
+    Retrieval Works" section."""
+    return (raw_similarity + 1) / 2
+
+
 def compute_final_score(semantic: float, retrievability: float, frequency: float) -> float:
     """Weighted SUM (not product) of the three ranking signals. See
     architecture.md for why a sum is used — a weak signal on one term (e.g.
