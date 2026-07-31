@@ -1,4 +1,5 @@
 import os
+import uuid
 import psycopg2
 from sentence_transformers import SentenceTransformer
 from qdrant_client import QdrantClient
@@ -22,6 +23,15 @@ def get_pg_conn():
         password=os.getenv("POSTGRES_PASSWORD")
     )
 
+def normalize_id(id: str) -> str:
+    """Validate and normalize a memory id to canonical UUID string form.
+    Raises ValueError (not a raw DB exception) if id isn't a valid UUID —
+    fail fast, before ever reaching the database. Also fixes a real bug:
+    Postgres always returns UUIDs in canonical lowercase-dashed form, so a
+    validly-formatted but differently-cased input id would otherwise fail
+    to match dict keys built from query results. See security-preventions.md."""
+    return str(uuid.UUID(id))
+
 CREATE_MEMORIES_TABLE = """
 CREATE TABLE IF NOT EXISTS memories (
     id UUID PRIMARY KEY,
@@ -37,30 +47,54 @@ CREATE TABLE IF NOT EXISTS memories (
 """
 
 def insert_memory(id: str, text: str, impact: float, stability: float):
+    id = normalize_id(id)
     conn = get_pg_conn()
-    cur = conn.cursor()
-    cur.execute(
-        "INSERT INTO memories (id, text, impact, stability) VALUES (%s, %s, %s, %s)",
-        (id, text, impact, stability)
-    )
-    conn.commit()
-    cur.close()
-    conn.close()
+    try:
+        with conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "INSERT INTO memories (id, text, impact, stability) VALUES (%s, %s, %s, %s)",
+                    (id, text, impact, stability)
+                )
+    finally:
+        conn.close()
 
 def get_memories_metadata(ids: list[str]) -> dict:
     """Fetch stability, use_count, and last_reinforced_at for a set of memory IDs.
     Returns a dict keyed by id string for easy lookup. Plain read — no computation,
     no business logic; the caller (router) turns these into retrievability/frequency."""
+    ids = [normalize_id(id) for id in ids]
     conn = get_pg_conn()
-    cur = conn.cursor()
-    cur.execute(
-        "SELECT id, stability, use_count, last_reinforced_at FROM memories WHERE id = ANY(%s::uuid[])",
-        (ids,)
-    )
-    rows = cur.fetchall()
-    cur.close()
-    conn.close()
+    try:
+        with conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "SELECT id, stability, use_count, last_reinforced_at FROM memories WHERE id = ANY(%s::uuid[])",
+                    (ids,)
+                )
+                rows = cur.fetchall()
+    finally:
+        conn.close()
     return {
         str(row[0]): {"stability": row[1], "use_count": row[2], "last_reinforced_at": row[3]}
         for row in rows
     }
+
+def update_memory_reinforcement(id: str, stability: float):
+    """Apply reinforcement: write the new (already-computed) stability,
+    increment use_count by 1, refresh last_reinforced_at to now. Plain write
+    — no business logic; the caller already computed the new stability via
+    compute_reinforced_stability. use_count increments in SQL itself
+    (use_count + 1) rather than being passed in, so two concurrent
+    reinforcements can't clobber each other's increment."""
+    id = normalize_id(id)
+    conn = get_pg_conn()
+    try:
+        with conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "UPDATE memories SET stability = %s, use_count = use_count + 1, last_reinforced_at = NOW() WHERE id = %s::uuid",
+                    (stability, id)
+                )
+    finally:
+        conn.close()

@@ -61,8 +61,6 @@ This is a deliberately verbose response — kept as separate fields rather than 
 
 `retrieval_count` bookkeeping (incrementing it for whatever search returns) is **not yet implemented** — despite being conceptually part of search, not reinforcement.
 
-**Reinforce (mark as meaningfully used)** `POST /memories/{id}/use` — not yet implemented
+**Reinforce (mark as meaningfully used)** `reinforce_memory(id)` in `memory_operations.py` — implemented, but **not an HTTP endpoint**. There's currently no external consumer of this API other than manual testing, so there's nothing to justify a route yet — see `architecture.md`'s Controller section. Called directly by whatever determines a memory was actually used (not just returned by search) — currently nothing does this automatically, since there's no LLM/agent integration built yet. Increments `use_count`, bumps `stability` via `compute_reinforced_stability`, updates `last_reinforced_at`. Raises `ValueError` if the id doesn't exist.
 
-Called explicitly by whatever consumes search results, once a memory is confirmed actually used (not just returned). Increments `use_count`, bumps `stability`, updates `last_reinforced_at`. See `architecture.md` for the full formula.
-
-Response models will expand as this is implemented.
+Would become `POST /memories/{id}/use` (a thin route wrapping this same function) if an external caller — e.g. a future UI — ever needs one.
