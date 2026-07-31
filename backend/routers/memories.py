@@ -36,9 +36,15 @@ def store(body: MemoryInput):
 
     return {"id": id, "text": body.text}
 
-@router.post("/memories/search")
-def search(body: SearchInput):
-    vector = model.encode(body.text).tolist()
+def search_memories(text: str, limit: int):
+    """Embed text, retrieve and rank candidate memories. Returns a ranked
+    list (possibly empty) — shared by /memories/search (raw results, no LLM
+    involved — used for debugging/calibrating ranking, e.g. the
+    SEMANTIC_THRESHOLD tuning in architecture.md) and /generate (feeds the
+    results into the generation prompt). One implementation so ranking logic
+    can't drift between callers — same reasoning as formulas.py. See
+    architecture.md's Controller section."""
+    vector = model.encode(text).tolist()
     results = qdrant.query_points(
         collection_name=COLLECTION_NAME,
         query=vector,
@@ -80,8 +86,11 @@ def search(body: SearchInput):
         })
 
     ranked.sort(key=lambda r: r["final_score"], reverse=True)
+    return ranked[:limit]
 
+@router.post("/memories/search")
+def search(body: SearchInput):
+    ranked = search_memories(body.text, body.limit)
     if not ranked:
         return {"message": "No valid memories found"}
-
-    return ranked[:body.limit]
+    return ranked

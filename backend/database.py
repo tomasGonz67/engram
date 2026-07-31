@@ -3,6 +3,7 @@ import uuid
 import psycopg2
 from sentence_transformers import SentenceTransformer
 from qdrant_client import QdrantClient
+from openai import OpenAI
 
 COLLECTION_NAME = "memories"
 VECTOR_SIZE = 1024
@@ -13,6 +14,9 @@ qdrant = QdrantClient(
     host=os.getenv("QDRANT_HOST"),
     port=int(os.getenv("QDRANT_PORT"))
 )
+
+openai_client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+GENERATION_MODEL = os.getenv("GENERATION_MODEL", "gpt-5.4-nano")
 
 def get_pg_conn():
     return psycopg2.connect(

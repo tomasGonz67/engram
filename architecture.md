@@ -29,6 +29,20 @@ If nothing survives filtering, `search()` returns `{"message": "No valid memorie
 
 ---
 
+## How Generation Works
+
+`/generate` is the "AG" half of RAG, built on top of retrieval:
+
+1. **Retrieve** — `search_memories()` (shared with `/memories/search`, see Controller section below) runs the query through the same embed → search → rank pipeline as Stage 1/2 above, returning the top `limit` ranked memories.
+2. **Assemble the prompt** — system prompt + retrieved memories (as plain `(id) text` lines) + the caller-supplied `recent_turns` + the new query, all as one `messages` list sent to the generation model (`gpt-5.4-nano`, see `techStack.md`).
+3. **Call the model with `reinforce_memory` exposed as a tool** — the model can call it, by id, for any memory it actually used to answer. The system prompt explicitly tells it not to call the tool for memories that were merely shown but not relied on.
+4. **Execute any tool calls** — for each `reinforce_memory` call, invoke the real function from `memory_operations.py`, which updates `stability`/`use_count` in Postgres. A hallucinated or nonexistent id raises `ValueError`, which is caught and skipped rather than failing the whole request.
+5. **Second completion call** — the first response often has no text content when tool calls are present, so a second call (with the tool results appended to the message list) gets the model's final natural-language answer.
+
+The response returns the answer, which memory IDs actually got reinforced, and the full `retrieved` list — so a caller can see what was available even if the model didn't use all of it.
+
+---
+
 ## Memory Lifecycle (Decay, Reinforcement, Consolidation)
 
 **Constants**
@@ -87,8 +101,8 @@ Layered architecture mapped to MVC:
   - `database.py` — data access. Holds the Qdrant client, embedding model, and the Postgres connection helper. Plain functions that take already-finished values and read/write them — no business logic, no clamping, no derived-value computation. Reads all connection info from environment variables — no hardcoded credentials.
 - **View** — none yet. Would be React if a frontend is added.
 - **Controller** — split across two places, same role (orchestration: fetch, compute, write), split by whether it's wired to an HTTP route:
-  - `routers/` — actual HTTP routes. Each file is a resource (memories, etc.). Owns business logic, calls `formulas.py` for calculations and `database.py` purely for reads/writes, returns responses.
-  - `memory_operations.py` — orchestration with no current external caller (e.g. `reinforce_memory`, called directly by whatever determines a memory was meaningfully used — currently nothing does, since there's no LLM/agent integration yet). Same internal shape as a router function, just not wrapped in a route. Trivial to wrap in one later if an external caller (e.g. a future UI) ever needs it.
+  - `routers/` — actual HTTP routes. Each file is a resource (memories, generate). Owns business logic, calls `formulas.py` for calculations and `database.py` purely for reads/writes, returns responses. Retrieval is a plain function, `search_memories()` in `routers/memories.py`, shared by `/memories/search` (returns ranked results directly, no LLM involved — used for debugging/calibrating ranking, e.g. the `SEMANTIC_THRESHOLD` tuning above) and `/generate` (feeds the results into the generation prompt). One implementation so ranking logic can't drift between callers — same reasoning as `formulas.py`.
+  - `memory_operations.py` — orchestration with no dedicated HTTP route of its own (e.g. `reinforce_memory`). Now has a real caller: `/generate` invokes it directly when the LLM calls the `reinforce_memory` tool after actually using a retrieved memory in its answer. Same internal shape as a router function, just not wrapped in its own route — could still get one later (e.g. `POST /memories/{id}/use`) if a caller other than the LLM tool-loop needs it.
 - **App entry point** — `main.py` — app setup, lifespan, router registration. No business logic.
 - **Formulas** — `formulas.py` — every calculation from this doc (impact clamping, stability, retrievability, frequency, semantic normalization, final score) as pure, independently testable functions. Not part of the MVC split itself — routers call into it rather than computing things inline, so the same math can't drift between call sites (e.g. Consolidation will need `compute_retrievability` too, once built).
 - **Constants** — `constants.py` — shared, tunable values (see below). Imported by `formulas.py` (most of them) and directly by `routers/` for the few that are orchestration parameters rather than formula inputs (e.g. `CANDIDATE_POOL_SIZE`). Not part of the MVC split itself, just a single source of truth so tuning values live in one place instead of scattered across the codebase.

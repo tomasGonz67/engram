@@ -64,3 +64,21 @@ This is a deliberately verbose response — kept as separate fields rather than 
 **Reinforce (mark as meaningfully used)** `reinforce_memory(id)` in `memory_operations.py` — implemented, but **not an HTTP endpoint**. There's currently no external consumer of this API other than manual testing, so there's nothing to justify a route yet — see `architecture.md`'s Controller section. Called directly by whatever determines a memory was actually used (not just returned by search) — currently nothing does this automatically, since there's no LLM/agent integration built yet. Increments `use_count`, bumps `stability` via `compute_reinforced_stability`, updates `last_reinforced_at`. Raises `ValueError` if the id doesn't exist.
 
 Would become `POST /memories/{id}/use` (a thin route wrapping this same function) if an external caller — e.g. a future UI — ever needs one.
+
+**Generate** `POST /generate` — the "AG" half of RAG. Retrieves relevant memories via `search_memories()` (same ranking logic `/memories/search` uses), sends them plus the query to the generation model (`gpt-5.4-nano`, see `techStack.md`) with `reinforce_memory` exposed as a tool. If the model calls it for a memory it actually relied on, that memory's `stability`/`use_count` are updated for real via `memory_operations.reinforce_memory` — not just acknowledged and dropped. See `architecture.md`'s "How Generation Works" section for the full flow.
+
+**Generate request** `POST /generate`
+
+| Field | Description |
+|-------|--------------|
+| `text` | The user's query (required) |
+| `limit` | How many memories `search_memories()` should retrieve (default 5) |
+| `recent_turns` | Caller-supplied short-term conversation context (`{role, content}` list) — Engram has no session concept of its own, so the caller tracks and passes this in; see `architecture.md`'s statelessness note |
+
+**Generate response** `POST /generate`
+
+| Field | Description |
+|-------|--------------|
+| `answer` | The model's final natural-language answer |
+| `reinforced_memory_ids` | IDs of memories the model actually called `reinforce_memory` on — a subset of (or none of) `retrieved` |
+| `retrieved` | The full ranked memory list `search_memories()` returned, same shape as `/memories/search`'s response — included so the caller can see what was available even if the model didn't use all of it |

@@ -2,7 +2,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from qdrant_client.models import Distance, VectorParams
 from database import qdrant, COLLECTION_NAME, VECTOR_SIZE, get_pg_conn, CREATE_MEMORIES_TABLE
-from routers import memories
+from routers import memories, generate
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -27,3 +27,4 @@ async def lifespan(app: FastAPI):
 app = FastAPI(lifespan=lifespan)
 
 app.include_router(memories.router)
+app.include_router(generate.router)
