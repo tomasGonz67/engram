@@ -84,6 +84,24 @@ def get_memories_metadata(ids: list[str]) -> dict:
         for row in rows
     }
 
+def increment_retrieval_counts(ids: list[str]):
+    """Bump retrieval_count for whatever search actually returns to a
+    caller — shown, not necessarily used. Plain write, no business logic.
+    Batched via ANY(%s::uuid[]) rather than one query per id."""
+    ids = [normalize_id(id) for id in ids]
+    if not ids:
+        return
+    conn = get_pg_conn()
+    try:
+        with conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "UPDATE memories SET retrieval_count = retrieval_count + 1 WHERE id = ANY(%s::uuid[])",
+                    (ids,)
+                )
+    finally:
+        conn.close()
+
 def update_memory_reinforcement(id: str, stability: float):
     """Apply reinforcement: write the new (already-computed) stability,
     increment use_count by 1, refresh last_reinforced_at to now. Plain write

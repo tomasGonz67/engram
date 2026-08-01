@@ -59,7 +59,7 @@ This is a deliberately verbose response — kept as separate fields rather than 
 
 **If nothing survives filtering, the response is a different shape**: `{"message": "No valid memories found"}` instead of an array. A deliberate exception to "the response type should always be the same" — chosen so there's no need to fake a memory-shaped placeholder object (a fake `id` or an out-of-bounds `final_score` like `100`, both considered and rejected) just to keep the shape uniform. Any caller of this endpoint needs to handle both an array and this object.
 
-`retrieval_count` bookkeeping (incrementing it for whatever search returns) is **not yet implemented** — despite being conceptually part of search, not reinforcement.
+`retrieval_count` bookkeeping — incrementing it for whatever `search_memories()` actually returns (not every candidate considered internally) — is implemented via `increment_retrieval_counts()` in `database.py`, called from `search_memories()` so both `/memories/search` and `/generate` correctly count as retrieval events. Batched in one query via `ANY(%s::uuid[])` rather than one update per id.
 
 **Reinforce (mark as meaningfully used)** `reinforce_memory(id)` in `memory_operations.py` — implemented, but **not an HTTP endpoint**. There's currently no external consumer of this API other than manual testing, so there's nothing to justify a route yet — see `architecture.md`'s Controller section. Called directly by whatever determines a memory was actually used (not just returned by search) — currently nothing does this automatically, since there's no LLM/agent integration built yet. Increments `use_count`, bumps `stability` via `compute_reinforced_stability`, updates `last_reinforced_at`. Raises `ValueError` if the id doesn't exist.
 

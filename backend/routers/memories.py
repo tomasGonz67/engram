@@ -2,7 +2,7 @@ import uuid
 from fastapi import APIRouter
 from qdrant_client.models import PointStruct
 from models import MemoryInput, SearchInput
-from database import model, qdrant, COLLECTION_NAME, insert_memory, get_memories_metadata
+from database import model, qdrant, COLLECTION_NAME, insert_memory, get_memories_metadata, increment_retrieval_counts
 from constants import CANDIDATE_POOL_SIZE, SEMANTIC_THRESHOLD
 from formulas import (
     clamp_impact,
@@ -86,7 +86,9 @@ def search_memories(text: str, limit: int):
         })
 
     ranked.sort(key=lambda r: r["final_score"], reverse=True)
-    return ranked[:limit]
+    top = ranked[:limit]
+    increment_retrieval_counts([str(r["id"]) for r in top])
+    return top
 
 @router.post("/memories/search")
 def search(body: SearchInput):
