@@ -9,10 +9,12 @@ Usage:
 
 Requires the dev environment to already be running (see DEVELOPMENT.md).
 
-Note: since /use isn't implemented yet, every seeded memory starts with
-use_count=0 and a fresh last_reinforced_at — this exercises semantic
-relevance, threshold filtering, and impact/stability variation, but not
-frequency/reinforcement differences. See architecture.md.
+Note: every seeded memory starts with use_count=0 and a fresh
+last_reinforced_at — this exercises semantic relevance, threshold
+filtering, and impact/stability variation out of the box. Reinforcement
+(use_count/stability growth) only happens through real use — either
+memory_operations.reinforce_memory() called directly, or /generate's
+model actually citing a memory — not from seeding. See architecture.md.
 """
 
 import json

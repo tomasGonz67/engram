@@ -19,8 +19,6 @@
 - **Separate importance / attention_quality / understanding / emotional_salience fields** — rejected. All collapse into the single `impact` field ("how significant/emotionally weighted is this to me"); no clear signal distinguishes them from each other or from impact, and several (attention_quality, understanding) have no natural input signal at all for a system storing text via an API call.
 - **Variable reinforcement_gain** (`1.1 + 0.2 × (1 - retrievability)` — bigger stability boost for memories that had decayed further before being reinforced) — good future improvement, models the real spacing effect more accurately than a fixed multiplier. Deferred: the fixed `REINFORCEMENT_MULTIPLIER = 1.2` is simpler and good enough to start collecting real usage data before tuning something more elaborate.
 - **Migrations** — not using, personal project.
-
-
 - **ORM (SQLAlchemy)** — considered for Postgres interaction. Rejected — one table, simple queries (insert, update stability, delete where computed retrievability < threshold). Raw SQL with psycopg2 is cleaner and easier to reason about for this project size. Revisit if schema complexity grows significantly.
 
 ---

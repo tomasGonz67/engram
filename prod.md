@@ -29,6 +29,16 @@ Vector dimensions are fixed at collection creation time in Qdrant. Switching mod
 
 ---
 
+## Generation API (OpenAI) — required for prod
+
+Unlike the embedding model (self-hosted, see above), the generation model (`gpt-5.4-nano`, see `techStack.md`) is an external paid API — every `/generate` call costs real money, with no rate limiting yet (see `security-preventions.md`). This is the only route in Engram with a per-request dollar cost, and by design (no auth, ever) it's reachable by anyone who finds the URL.
+
+**Before any public deployment:**
+- Rate limiting on `/generate` specifically — highest priority, since it's the only route where an open API translates directly into an open bill
+- A spend cap/budget alert on the OpenAI account itself, not just an app-level rate limit — the same reasoning as spend alerts on any cloud account, since the app-level limit is the only thing standing between a traffic spike and an unbounded bill
+
+---
+
 ## ENVIRONMENT variable — required for prod
 
 `scripts/clear.sh` (see `DEVELOPMENT.md`) destroys all Postgres and Qdrant data and refuses to run if `ENVIRONMENT` resolves to `production` — but it reads that value out of the compose file it's pointed at, not a host shell variable. There is no production deployment yet, but whichever compose file (or equivalent config) ends up defining the production environment **must** set `ENVIRONMENT: production` on the backend service. Without it, this guard is a no-op and the reset script could be run against production data.

@@ -44,6 +44,13 @@ Qdrant handles semantic search — returns IDs of the most similar vectors. Post
 | `id` | UUID of the stored memory |
 | `text` | Original text |
 
+**Search request** `POST /memories/search`
+
+| Field | Description |
+|-------|--------------|
+| `text` | Query text to embed and search against (required) |
+| `limit` | Max number of ranked results to return (optional, defaults to 5, must be >= 1) |
+
 **Search response** `POST /memories/search` — full weighted ranking is implemented. Fetches a wide candidate pool from Qdrant, normalizes and semantic-threshold-filters it, discards any candidate with no matching Postgres row (can't compute retrievability/frequency without `stability`/`use_count`), computes all three ranking signals for what's left, and returns the top `limit` sorted by `final_score` descending:
 
 | Field | Description |
@@ -72,7 +79,7 @@ Would become `POST /memories/{id}/use` (a thin route wrapping this same function
 | Field | Description |
 |-------|--------------|
 | `text` | The user's query (required) |
-| `limit` | How many memories `search_memories()` should retrieve (default 5) |
+| `limit` | How many memories `search_memories()` should retrieve (default 5, must be >= 1) |
 | `recent_turns` | Caller-supplied short-term conversation context (`{role, content}` list) — Engram has no session concept of its own, so the caller tracks and passes this in; see `architecture.md`'s statelessness note |
 
 **Generate response** `POST /generate`
