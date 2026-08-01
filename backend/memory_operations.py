@@ -6,8 +6,8 @@ operations with no current external caller. Trivial to wrap in a route
 later if one's ever needed (see dataModel.md).
 """
 
-from database import get_memories_metadata, update_memory_reinforcement, normalize_id
-from formulas import compute_reinforced_stability
+from database import get_memories_metadata, update_memory_reinforcement, normalize_id, get_all_memories, delete_memories
+from formulas import compute_reinforced_stability, compute_age_days, compute_retrievability, compute_consolidation_threshold
 
 
 def reinforce_memory(id: str):
@@ -23,3 +23,27 @@ def reinforce_memory(id: str):
 
     new_stability = compute_reinforced_stability(meta["stability"])
     update_memory_reinforcement(id, new_stability)
+
+
+def consolidate():
+    """Prune memories that have decayed past recovery. The prune threshold
+    scales with impact — high-impact memories must decay further before
+    they're eligible, modeling flashbulb-memory-style enhanced durability
+    rather than treating every memory's decay uniformly. See
+    architecture.md's Consolidation section.
+
+    Not an HTTP route — Engram has no auth by design, and this is
+    destructive, so it only runs from the background loop in main.py's
+    lifespan. Returns the list of deleted ids."""
+    memories = get_all_memories()
+    to_delete = []
+    for m in memories:
+        age_days = compute_age_days(m["last_reinforced_at"])
+        retrievability = compute_retrievability(m["stability"], age_days)
+        threshold = compute_consolidation_threshold(m["impact"])
+        if retrievability < threshold:
+            to_delete.append(m["id"])
+
+    if to_delete:
+        delete_memories(to_delete)
+    return to_delete

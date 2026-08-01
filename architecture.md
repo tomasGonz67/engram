@@ -80,7 +80,7 @@ retrieval_count += 1
 ```
 Does **not** touch `stability`. Being shown is not reinforcement — see below for why.
 
-**On meaningful use — explicit signal only (`POST /memories/{id}/use`, not automatic)**
+**On meaningful use — explicit signal only, not automatic**
 ```
 stability = min(stability × REINFORCEMENT_MULTIPLIER, MAX_STABILITY)
 use_count += 1
@@ -91,6 +91,25 @@ Reinforcing on every search *return* (rather than confirmed use) creates a self-
 The `MAX_STABILITY` cap exists because reinforcement is multiplicative and otherwise unbounded — without it, a heavily-used memory's `age_days / stability` ratio would trend to ~0 for any realistic elapsed time, making retrievability permanently ~100% even after years of neglect. That defeats the entire point of decay for exactly the memories that were reinforced the most.
 
 **Deferred, not built**: a Difficulty parameter, a Confidence parameter, and a variable reinforcement gain (bigger stability boost for memories that had decayed further before being reinforced) are all documented as considered-and-deferred in `techDebt.md` — none has a real signal driving it yet, or isn't needed for a working v1.
+
+**Consolidation — implemented.** Prunes memories that have decayed past any realistic chance of being retrieved again, deleting them from Postgres and Qdrant together so the two stores can't drift out of sync — same reasoning as `scripts/clear.sh`.
+
+```
+threshold = MIN_RETRIEVABILITY / impact
+prune if retrievability < threshold
+```
+
+The threshold scales with `impact` rather than treating every memory's decay uniformly — grounded in **flashbulb memory** research (Neisser & Harsch's Challenger disaster study is the key citation): sufficiently significant/emotional events get a real, measurable consolidation boost at encoding (amygdala-mediated enhancement of hippocampal LTP via noradrenergic arousal signals), so they persist longer without reinforcement — but that boost is *not* permanent immunity. Flashbulb memories still decay in accuracy over time, despite people's confidence in them staying artificially high; they just start stronger and fade slower. A hard exemption for high-impact memories would overshoot what the research actually supports, so the threshold is scaled, not waived.
+
+`MIN_RETRIEVABILITY = 0.05` was validated against the decay math before being picked, not guessed: a never-reinforced memory at min impact (0.5) becomes prune-eligible after ~7 weeks; baseline impact (1.0) after ~13 months; max impact (2.0) after ~8.75 years; anything genuinely reinforced (`stability` near the `MAX_STABILITY` cap) is effectively never pruned. Verified directly: a test memory backdated to a year old with min impact was correctly deleted from both Postgres and Qdrant, while 75 freshly-seeded memories in the same run were correctly left untouched.
+
+**Runs on a weekly `asyncio` loop inside the app, not a manual script or an HTTP route.** Three deliberate choices here:
+
+1. **Automated, not manual** — unlike `scripts/seed.py`/`scripts/clear.sh` (both hand-triggered), Consolidation runs on its own for as long as the app is up. The backend is already a long-running process, so a loop started in `main.py`'s `lifespan` (`asyncio.create_task`, cancelled on shutdown) costs nothing extra to add — no new dependency (no APScheduler), no OS-level cron needed.
+2. **Weekly, not daily** — chosen for the actual timescale of decay, not performance. Each run is cheap regardless of interval (a small table scan, pure-Python math, a batched delete — no external API calls, unlike `/generate`), so interval doesn't meaningfully affect cost. But retrievability moves on a scale of weeks-to-months (see the numbers above), so checking daily would just re-scan a table that's barely changed since yesterday. Weekly matches the data; daily would be busywork.
+3. **No HTTP route** — this is destructive (real deletions), and Engram has no auth by design (see the project decision to never add it). A public `POST /consolidate` would let anyone on the internet trigger mass deletion. Keeping it as an internal-only background loop means there's no route to protect in the first place.
+
+**Why a real thread (`asyncio.to_thread`), not just `async`/`await`.** These solve different problems and get confused easily. Plain `async`/`await` is cooperative concurrency on a *single* thread — coroutines only yield control at `await` points, so a blocking call with no `await` in it (like a synchronous `psycopg2` query) hogs that one thread completely, stalling every other request (`/generate`, `/memories/search`, everything) until it finishes. Wrapping the blocking DB work in `asyncio.to_thread()` instead hands it to a real, separate OS thread from a shared pool — the event loop stays free to keep serving requests while that thread does its own work in parallel, and `await` just means "resume this coroutine once that thread's result is ready." This is the same mechanism FastAPI already uses under the hood for every plain-`def` route (`run_in_threadpool`) — Consolidation's loop just applies the identical pattern explicitly, rather than introducing a new one. One caveat worth naming: Python's GIL means threads don't buy true CPU-parallelism — two threads can't execute Python bytecode at the same instant — but the GIL releases during I/O waits (a network round-trip to Postgres or Qdrant), which is exactly what this workload is, so the threading genuinely helps here despite the GIL.
 
 ---
 
@@ -106,7 +125,7 @@ Layered architecture mapped to MVC:
   - `routers/` — actual HTTP routes. Each file is a resource (memories, generate). Owns business logic, calls `formulas.py` for calculations and `database.py` purely for reads/writes, returns responses. Retrieval is a plain function, `search_memories()` in `routers/memories.py`, shared by `/memories/search` (returns ranked results directly, no LLM involved — used for debugging/calibrating ranking, e.g. the `SEMANTIC_THRESHOLD` tuning above) and `/generate` (feeds the results into the generation prompt). One implementation so ranking logic can't drift between callers — same reasoning as `formulas.py`.
   - `memory_operations.py` — orchestration with no dedicated HTTP route of its own (e.g. `reinforce_memory`). Now has a real caller: `/generate` invokes it directly when the LLM calls the `reinforce_memory` tool after actually using a retrieved memory in its answer. Same internal shape as a router function, just not wrapped in its own route — could still get one later (e.g. `POST /memories/{id}/use`) if a caller other than the LLM tool-loop needs it.
 - **App entry point** — `main.py` — app setup, lifespan, router registration. No business logic.
-- **Formulas** — `formulas.py` — every calculation from this doc (impact clamping, stability, retrievability, frequency, semantic normalization, final score) as pure, independently testable functions. Not part of the MVC split itself — routers call into it rather than computing things inline, so the same math can't drift between call sites (e.g. Consolidation will need `compute_retrievability` too, once built).
+- **Formulas** — `formulas.py` — every calculation from this doc (impact clamping, stability, retrievability, frequency, semantic normalization, final score) as pure, independently testable functions. Not part of the MVC split itself — routers call into it rather than computing things inline, so the same math can't drift between call sites (e.g. Consolidation reuses `compute_retrievability` too, via `memory_operations.py`).
 - **Constants** — `constants.py` — shared, tunable values (see below). Imported by `formulas.py` (most of them) and directly by `routers/` for the few that are orchestration parameters rather than formula inputs (e.g. `CANDIDATE_POOL_SIZE`). Not part of the MVC split itself, just a single source of truth so tuning values live in one place instead of scattered across the codebase.
 
 Concerns are separated by responsibility. Structure expands as complexity justifies it — not prematurely.

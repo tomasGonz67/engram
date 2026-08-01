@@ -84,6 +84,39 @@ def get_memories_metadata(ids: list[str]) -> dict:
         for row in rows
     }
 
+def get_all_memories():
+    """Fetch id, stability, last_reinforced_at, impact for every stored
+    memory. Used by Consolidation to compute retrievability and decide what
+    to prune. Plain read, no business logic."""
+    conn = get_pg_conn()
+    try:
+        with conn:
+            with conn.cursor() as cur:
+                cur.execute("SELECT id, stability, last_reinforced_at, impact FROM memories")
+                rows = cur.fetchall()
+    finally:
+        conn.close()
+    return [
+        {"id": str(row[0]), "stability": row[1], "last_reinforced_at": row[2], "impact": row[3]}
+        for row in rows
+    ]
+
+def delete_memories(ids: list[str]):
+    """Delete memories from both Postgres and Qdrant together, so they can
+    never drift out of sync with each other — same reasoning as
+    scripts/clear.sh. Plain write, no business logic."""
+    ids = [normalize_id(id) for id in ids]
+    if not ids:
+        return
+    conn = get_pg_conn()
+    try:
+        with conn:
+            with conn.cursor() as cur:
+                cur.execute("DELETE FROM memories WHERE id = ANY(%s::uuid[])", (ids,))
+    finally:
+        conn.close()
+    qdrant.delete(collection_name=COLLECTION_NAME, points_selector=ids)
+
 def increment_retrieval_counts(ids: list[str]):
     """Bump retrieval_count for whatever search actually returns to a
     caller — shown, not necessarily used. Plain write, no business logic.

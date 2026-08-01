@@ -16,7 +16,7 @@ Engram is not intended to simulate the brain exactly. Instead, it adapts well-es
 
 - **Decay** — a memory's retrievability decreases over time if not reinforced
 - **Reinforcement** — a memory is only strengthened by confirmed, meaningful use — not merely by being returned in a search. Being shown and being used are tracked separately so popular results don't self-reinforce just from exposure
-- **Consolidation** — periodic processes prune weak memories, merge duplicates, and stabilize important ones
+- **Consolidation** — a weekly background process prunes memories that have decayed past recovery; the threshold scales with impact so significant memories persist longer without reinforcement, not a flat rule applied to everyone
 - **Weighted Retrieval** — memory ranking combines semantic similarity, retrievability (which itself accounts for strength and recency), and how often a memory has actually been used
 
 See `architecture.md` for the full formulas and reasoning behind each principle.

@@ -10,6 +10,7 @@ from constants import (
     SEMANTIC_WEIGHT,
     RETRIEVABILITY_WEIGHT,
     FREQUENCY_WEIGHT,
+    MIN_RETRIEVABILITY,
 )
 
 
@@ -69,6 +70,15 @@ def normalize_qdrant_similarity(raw_similarity: float) -> float:
     into compute_final_score's weighted sum. See architecture.md's "How
     Retrieval Works" section."""
     return (raw_similarity + 1) / 2
+
+
+def compute_consolidation_threshold(impact: float) -> float:
+    """MIN_RETRIEVABILITY / impact — how low retrievability must drop before
+    a memory is prune-eligible. Scales with impact so high-impact memories
+    need to decay further before deletion, modeling flashbulb-memory-style
+    enhanced durability rather than pruning purely on time and reinforcement
+    alone. See architecture.md's Consolidation section."""
+    return MIN_RETRIEVABILITY / impact
 
 
 def compute_final_score(semantic: float, retrievability: float, frequency: float) -> float:

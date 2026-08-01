@@ -34,3 +34,13 @@ FREQUENCY_WEIGHT = 0.10
 # layer. Known-relevant matches have scored 0.834+. Not a validated value —
 # revisit with a larger, more systematic dataset. See architecture.md.
 SEMANTIC_THRESHOLD = 0.75
+
+# Consolidation
+# Base floor before impact-scaling — a memory is prune-eligible once
+# retrievability < MIN_RETRIEVABILITY / impact. Validated against the decay
+# math: min impact (0.5) prunes after ~7 weeks unused, baseline impact (1.0)
+# after ~13 months, max impact (2.0) after ~8.75 years, and anything
+# genuinely reinforced (stability near MAX_STABILITY) is effectively never
+# pruned. See architecture.md's Consolidation section.
+MIN_RETRIEVABILITY = 0.05
+CONSOLIDATION_INTERVAL_SECONDS = 7 * 86400  # weekly — matches decay's actual timescale (weeks-to-months), not an arbitrary short default
