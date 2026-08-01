@@ -23,6 +23,7 @@ def reinforce_memory(id: str):
 
     new_stability = compute_reinforced_stability(meta["stability"])
     update_memory_reinforcement(id, new_stability)
+    return id
 
 
 def consolidate():
@@ -38,9 +39,18 @@ def consolidate():
     memories = get_all_memories()
     to_delete = []
     for m in memories:
-        age_days = compute_age_days(m["last_reinforced_at"])
-        retrievability = compute_retrievability(m["stability"], age_days)
-        threshold = compute_consolidation_threshold(m["impact"])
+        try:
+            age_days = compute_age_days(m["last_reinforced_at"])
+            retrievability = compute_retrievability(m["stability"], age_days)
+            threshold = compute_consolidation_threshold(m["impact"])
+        except (ValueError, ZeroDivisionError) as e:
+            # A malformed row (stability <= 0, impact == 0 — nothing in the
+            # schema prevents this, only app-level clamping at write time)
+            # must not kill the loop for every other memory. Skip and move
+            # on rather than letting one bad row silently disable
+            # Consolidation for the rest of the process's lifetime.
+            print(f"Consolidation: skipping malformed memory {m['id']}: {e}")
+            continue
         if retrievability < threshold:
             to_delete.append(m["id"])
 

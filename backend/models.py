@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 class MemoryInput(BaseModel):
     text: str
@@ -6,7 +6,7 @@ class MemoryInput(BaseModel):
 
 class SearchInput(BaseModel):
     text: str
-    limit: int = 5
+    limit: int = Field(default=5, ge=1)
 
 class Turn(BaseModel):
     role: str
@@ -14,7 +14,7 @@ class Turn(BaseModel):
 
 class GenerateInput(BaseModel):
     text: str
-    limit: int = 5
+    limit: int = Field(default=5, ge=1)
     # Caller-supplied short-term context (e.g. the last few messages of the
     # current session). Engram is stateless and has no session concept of
     # its own — see architecture.md — so tracking/trimming this window is

@@ -66,13 +66,17 @@ def generate(body: GenerateInput):
         for call in message.tool_calls:
             result = "unknown tool"
             if call.function.name == "reinforce_memory":
-                args = json.loads(call.function.arguments)
                 try:
-                    reinforce_memory(args["id"])
-                    reinforced_ids.append(args["id"])
+                    args = json.loads(call.function.arguments)
+                    normalized_id = reinforce_memory(args["id"])
+                    reinforced_ids.append(normalized_id)
                     result = "reinforced"
-                except ValueError:
-                    result = "memory not found, skipped"
+                except (ValueError, KeyError):
+                    # ValueError: malformed JSON, or a hallucinated/nonexistent
+                    # id. KeyError: well-formed JSON missing "id" entirely.
+                    # Either way, skip this one tool call rather than failing
+                    # the whole request.
+                    result = "invalid tool call, skipped"
             messages.append({
                 "role": "tool",
                 "tool_call_id": call.id,
