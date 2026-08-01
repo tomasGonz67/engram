@@ -20,7 +20,7 @@ Relational database. Stores all engram metadata — `impact`, `stability`, `retr
 
 **Why Postgres:**
 - Schema is fixed — every engram has the same fields, no flexibility needed
-- Consolidation (pruning weak memories) needs aggregate SQL queries over `stability`/`last_reinforced_at` — natural fit for SQL, not a document store
+- Consolidation (pruning weak memories) reads `stability`/`last_reinforced_at`/`impact` for every row and issues one batched `DELETE ... WHERE id = ANY(...)` for whatever's prune-eligible — the threshold math itself runs in Python (`memory_operations.consolidate()`), not SQL, but the bulk read/delete pattern is still a natural fit for a relational store, not a document store
 - ACID compliance — transaction guarantees when Consolidation updates many records at once
 - Better for relational data — if users are added later, foreign keys handle it cleanly
 

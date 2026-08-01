@@ -88,4 +88,4 @@ Would become `POST /memories/{id}/use` (a thin route wrapping this same function
 |-------|--------------|
 | `answer` | The model's final natural-language answer |
 | `reinforced_memory_ids` | IDs of memories the model actually called `reinforce_memory` on — a subset of (or none of) `retrieved` |
-| `retrieved` | The full ranked memory list `search_memories()` returned, same shape as `/memories/search`'s response — included so the caller can see what was available even if the model didn't use all of it |
+| `retrieved` | `search_memories()`'s raw return value — always an array, even if empty. Not the same as `/memories/search`'s HTTP response, which wraps an empty result in `{"message": "No valid memories found"}` instead; `/generate` has no equivalent wrapper. Included so the caller can see what was available even if the model didn't use all of it |
