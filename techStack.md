@@ -49,7 +49,7 @@ PyTorch is a dependency of sentence-transformers. Using the CPU-only build (`--e
 Loads and runs embedding models locally. Acts as the encoding layer — converts raw text into a vector, the form in which it's stored. Similar to how the brain encodes an experience into a neural representation that is consolidated into a memory.
 
 **Model (dev):** `Qwen/Qwen3-Embedding-0.6B` — 64.33 MTEB score, ~1.5GB RAM, **1024 dimensions**
-**Model (prod):** TBD — evaluating open source (Qwen3-Embedding-4B/8B) vs API options based on scale and cost
+**Model (prod):** `Qwen3-Embedding-8B` via API (OpenRouter, $0.01/M tokens) — decided, not self-hosted. See `prod.md`'s "Embedding Model" section for the full comparison and reasoning.
 
 **Why Qwen3-Embedding-0.6B for dev:**
 - 8 points higher than all-MiniLM-L6-v2 (64 vs 56 MTEB) — meaningfully better retrieval quality
