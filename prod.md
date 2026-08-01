@@ -1,17 +1,28 @@
 # Production Considerations
 
-## PyTorch
+## Architecture Overview
 
-Currently using CPU-only PyTorch to keep the Docker image small (~2.4GB vs ~14.5GB with full PyTorch). If deploying on a GPU instance (e.g. EC2 GPU), switch back to full PyTorch to take advantage of hardware acceleration — remove the `--extra-index-url` and `torch` lines from `requirements.txt` and let sentence-transformers pull the default full version.
+The full production plan, settled after comparing cost/quality tradeoffs for each piece individually — not a first guess, a conclusion reached by actually pricing out the alternatives:
 
-**Why CPU is acceptable now:**
+- **One droplet** runs the FastAPI backend and the static frontend build together, not split across separate platforms. Render doesn't run `docker-compose` natively (would fragment the stack into separate billed services); Vercel-for-frontend-only would force the backend to stay publicly reachable (Vercel has no fixed outbound IPs to allowlist against). One droplet is both cheaper and lets the backend stay fully internal if it's ever locked down.
+- **Postgres**: Neon (managed, free tier). Not self-hosted on the droplet.
+- **Vector DB**: Qdrant Cloud (managed, free tier). Not self-hosted on the droplet.
+- **Generation**: OpenAI `gpt-5.4-nano`, API (see `techStack.md`).
+- **Embedding**: `Qwen3-Embedding-8B`, API (via OpenRouter). Not self-hosted in prod — differs from dev, see "Embedding Model" below.
+
+With this, the droplet itself only runs the backend process and serves the frontend's static files — no database, no vector store, no ML model resident in memory. That's what makes the cheapest viable droplet tier realistic instead of needing a 4GB+ instance just to hold an embedding model in RAM.
+
+**Still required before any of this goes live**: rate limiting on `store`, `search`, and `generate` — all three now carry real per-call cost once both API migrations happen (Postgres/Qdrant are flat-rate free tiers, not billed per-call, so they don't carry this same risk), and Engram has no auth by design, so nothing else currently gates who can hit them. See "Embedding Model" and "Generation API" below.
+
+---
+
+## PyTorch — dev only
+
+Currently using CPU-only PyTorch to keep the Docker image small (~2.4GB vs ~14.5GB with full PyTorch). This only matters for **dev**, where the embedding model still runs self-hosted (see below) — prod no longer runs any local embedding inference at all once the migration happens, so the prod image wouldn't need `torch`/`sentence-transformers` as dependencies.
+
+**Why CPU is acceptable for dev:**
 - Single-user, low throughput — one request at a time
 - ~50-200ms per embedding on CPU is imperceptible at this scale
-
-**When to switch to GPU:**
-- High throughput — bulk imports, real-time feeds, multiple concurrent users
-- CPU becomes the bottleneck fast when embedding thousands of texts per second
-- GPU inference is ~10-40x faster (~2-5ms per embedding)
 
 ---
 
@@ -29,28 +40,57 @@ Whichever compose file or deployment config ends up building this image for prod
 
 ## Embedding Model
 
-Vector dimensions are fixed at collection creation time in Qdrant. Switching models in prod requires creating a new collection and re-embedding all stored memories.
+**Dev**: self-hosted `Qwen3-Embedding-0.6B` (1024 dimensions, ~1.5GB RAM) — see `techStack.md`.
 
-| Model | Dimensions |
-|-------|-----------|
-| Qwen3-Embedding-0.6B (dev) | 1024 |
-| Qwen3-Embedding-4B | 2560 |
-| Qwen3-Embedding-8B | 4096 |
-| OpenAI text-embedding-3-small | 1536 |
-| OpenAI text-embedding-3-large | 3072 |
+**Prod**: `Qwen3-Embedding-8B` via API (OpenRouter, $0.01/M tokens) — not self-hosted. Decision history, in order:
+
+1. First compared self-hosted 0.6B against OpenAI's `text-embedding-3-small` API. Self-hosted won outright — 64.33 MTEB vs 62.3, and *smaller* (1024 vs 1536 dimensions). Switching to that specific API would've been a downgrade on quality and storage both, for no benefit besides droplet RAM. Rejected.
+2. Then compared against the bigger Qwen3 variants. `Qwen3-Embedding-8B` scores 70.58 MTEB — a real jump over the current 64.33 — but self-hosting an 8B-parameter model isn't realistic on a budget droplet (~13x more parameters than 0.6B; would need a GPU instance, likely $500-1000+/mo). Via API, though, it's $0.01/M tokens — cheaper than the OpenAI option already rejected, and better quality than what's currently self-hosted. At Engram's actual usage volume this costs pennies a month regardless, so there's no real cost tradeoff to weigh — just better model, no new infra spend.
+
+**Consequence**: vector dimensions change from 1024 (current) to 4096 (`Qwen3-Embedding-8B`). Vector dimensions are fixed at collection creation time in Qdrant — this requires creating a new collection and re-embedding every stored memory, not a config toggle. It also reduces how many vectors fit in Qdrant Cloud's free tier from roughly ~100k down to ~25k — still vastly more than this project needs, but worth knowing since it's a real, measurable tradeoff of the switch.
+
+**Prerequisite**: rate limiting on `store`/`search` before this migration ships — both become tied to an external API bill once this happens, and Engram has no auth to gate them.
+
+---
+
+## Postgres — Neon (managed)
+
+Not self-hosted in prod — moved to Neon's free tier (0.5GB storage/project, up to 100 projects, scale-to-zero, $0 permanently). Picked over Supabase specifically because Engram only needs a plain `psycopg2` connection — Supabase bundles Auth/Storage/Realtime/Edge Functions that would sit entirely unused, adding complexity for no benefit. Supabase becomes the better pick only if Engram ever actually uses `pgvector` to consolidate the metadata and vector stores into one database (a real, considered alternative — see "Vector DB" below — but a bigger rearchitecture than a hosting swap, not adopted here).
+
+Migration is simple: `database.py` already reads all Postgres connection info from environment variables (`POSTGRES_HOST`, `POSTGRES_PORT`, etc.) — pointing at Neon instead of the local `postgres` container is just swapping those env var values, no code changes needed.
+
+At Engram's realistic scale (currently ~100 memory rows, ~200-500 bytes/row), 500MB comfortably holds somewhere between 1-2.5 million rows — not a real constraint at any scale this project is likely to reach as a personal tool.
+
+Neon's scale-to-zero means a brief cold-start delay on the first query after a period of inactivity — a non-issue given Engram's actual latency requirements (personal, sporadic usage, not a real-time system).
+
+---
+
+## Vector DB — Qdrant Cloud (managed)
+
+Not self-hosted in prod — moved to Qdrant Cloud's free tier (0.5 vCPU, 1GB RAM, 4GB disk, $0 permanently). This was actually the original plan from `techStack.md`'s own initial reasoning ("self-hostable with Docker locally, managed cloud for production... free tier covers this project"), written before any of this session's work — this decision just confirms and acts on it.
+
+**RAM, not disk, is the binding constraint** for a vector DB specifically — search performance depends on keeping the HNSW index resident in memory, unlike a relational DB, which can page rows in from disk on demand for typical indexed lookups. At ~10-15KB/vector (1024-dim, current) this free tier holds roughly 70-100k vectors; at ~4096-dim (`Qwen3-Embedding-8B`, once that migration happens) roughly 25k. Either way, vastly more than Engram's current scale (~100 memories) will realistically need.
+
+Requires an API key for access — unlike the current self-hosted Qdrant, which has no auth at all since it only lives on the private Docker network today. One more secret to manage, same pattern as `OPENAI_API_KEY` (env var, gitignored `.env`, never hardcoded in a committed compose file).
+
+**Considered alternative, not adopted**: consolidating Postgres and Qdrant into one database via Supabase's `pgvector` extension — this would incidentally fix the non-atomic dual-store write/delete bug already logged in `techDebt.md`, since one transaction could cover both the vector and the metadata. Genuine benefit, but a real rearchitecture (touches `database.py`, `search_memories()`'s two-stage retrieval, and most of `architecture.md`/`dataModel.md`), not a hosting swap — logged here as a real option for later, not something decided against permanently.
 
 ---
 
 ## Generation API (OpenAI) — required for prod
 
-Unlike the embedding model (self-hosted, see above), the generation model (`gpt-5.4-nano`, see `techStack.md`) is an external paid API — every `/generate` call costs real money, with no rate limiting yet (see `security-preventions.md`). This is the only route in Engram with a per-request dollar cost, and by design (no auth, ever) it's reachable by anyone who finds the URL.
+The generation model (`gpt-5.4-nano`, see `techStack.md`) is an external paid API — every `/generate` call costs real money. Combined with the embedding model move above, **three routes** (`store`, `search`, `generate`) all carry real per-call cost once both API migrations are live, not just `/generate` alone — and by design (no auth, ever) all three are reachable by anyone who finds the URL.
 
 **Before any public deployment:**
-- Rate limiting on `/generate` specifically — highest priority, since it's the only route where an open API translates directly into an open bill
-- A spend cap/budget alert on the OpenAI account itself, not just an app-level rate limit — the same reasoning as spend alerts on any cloud account, since the app-level limit is the only thing standing between a traffic spike and an unbounded bill
+- Rate limiting on all three routes — highest priority, since an open API now translates directly into an open bill on more than one endpoint, not just generation.
+- A spend cap/budget alert on both the OpenAI account and whichever provider hosts the embedding API — not just an app-level rate limit, the same reasoning as spend alerts on any cloud account, since the app-level limit is the only thing standing between a traffic spike and an unbounded bill.
+
+DDoS protection (e.g. proxying through Cloudflare's free tier) is a separate, additional layer worth adding eventually — rate limiting alone doesn't stop network-level flood attacks, since those can saturate the droplet's bandwidth before any application code even runs. Not yet decided on/built; noted here as a known gap, not solved by anything above.
 
 ---
 
 ## ENVIRONMENT variable — required for prod
 
 `scripts/clear.sh` (see `DEVELOPMENT.md`) destroys all Postgres and Qdrant data and refuses to run if `ENVIRONMENT` resolves to `production` — but it reads that value out of the compose file it's pointed at, not a host shell variable. There is no production deployment yet, but whichever compose file (or equivalent config) ends up defining the production environment **must** set `ENVIRONMENT: production` on the backend service. Without it, this guard is a no-op and the reset script could be run against production data.
+
+Note: once Postgres and Qdrant move to Neon/Qdrant Cloud (see above), `clear.sh` as currently written won't apply to them at all — it only resets the local Docker volumes. Whatever replaces it for a managed-service world still needs the same production safety check, just implemented against Neon/Qdrant Cloud's own reset/branch-reset mechanisms instead of `docker volume rm`.
