@@ -5,7 +5,6 @@ __pycache__/
 .env
 
 # Docker
-volumes/
 docker-compose.yml
 
 # OS
