@@ -12,6 +12,7 @@
 Reviewed as of the `database.py`/`memory_operations.py` security pass:
 
 - **SQL injection**: every query in `database.py` uses proper parameterized placeholders (`%s`), including the `ANY(%s::uuid[])` and `%s::uuid` casts — the cast applies to the safely-substituted value, not raw string interpolation. No injection surface found.
+- **CORS**: `CORSMiddleware` added in `main.py`, allowing the configured frontend origin (`ALLOWED_ORIGINS` env var, defaults to the Vite dev server) to call the API from a browser. Worth being precise about what this does and doesn't protect: since Engram has no auth by design, CORS isn't gating access to anything here — anyone can already call any route directly (`curl`, Postman, a script) regardless of CORS, since it's a browser-enforced restriction on browser-originated JS specifically, not a server-side access control. It exists purely so the frontend's own code can make requests without the browser blocking them as cross-origin — not a security boundary, just a functional requirement.
 
 ## To Add
 

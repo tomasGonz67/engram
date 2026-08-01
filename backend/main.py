@@ -1,6 +1,8 @@
 import asyncio
+import os
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from qdrant_client.models import Distance, VectorParams
 from database import qdrant, COLLECTION_NAME, VECTOR_SIZE, get_pg_conn, CREATE_MEMORIES_TABLE
 from routers import memories, generate
@@ -41,6 +43,16 @@ async def lifespan(app: FastAPI):
     task.cancel()
 
 app = FastAPI(lifespan=lifespan)
+
+# No auth by design (see project decision) — CORS here is just about which
+# browser origins may call the API, not a security boundary. Frontend origin
+# configurable since dev (Vite) and prod (Cloudflare Pages) differ.
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=os.getenv("ALLOWED_ORIGINS", "http://localhost:5173").split(","),
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 app.include_router(memories.router)
 app.include_router(generate.router)
