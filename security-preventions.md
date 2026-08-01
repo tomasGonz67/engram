@@ -2,7 +2,7 @@
 
 ## Credentials & Secrets
 
-- No hardcoded credentials in code — all connection info (Qdrant host/port, Postgres user/password/db, embedding model name) read from environment variables via `os.getenv()`
+- No hardcoded credentials in code — all connection info (Qdrant host/port, Postgres user/password/db, embedding/generation model names, `OPENAI_API_KEY`) read from environment variables via `os.getenv()`. `OPENAI_API_KEY` is the one genuine secret in this list — everything else is a throwaway local dev credential — and it's kept out of `docker-compose-dev.yml` entirely via `${OPENAI_API_KEY}` variable substitution from a gitignored `.env` file, rather than following the dev-credential pattern of being hardcoded directly in the committed compose file.
 - Environment variables passed to containers via docker-compose, not stored in code
 - `docker-compose.yml` (prod) added to `.gitignore` — never committed to GitHub
 - `docker-compose-dev.yml` is committed but contains only local dev credentials, not production secrets
