@@ -79,6 +79,10 @@ const NEUROSCIENCE_TERMS = [
     term: "impact",
     explanation: "How significant this memory seemed when first stored. Higher-impact memories resist decay longer even before being reinforced — loosely modeling how emotionally significant moments (\"flashbulb memories\") tend to be remembered more durably.",
   },
+  {
+    term: "reinforcement",
+    explanation: "What happens when a memory is confirmed to have actually been used, not just shown. Each reinforcement multiplies stability by 1.2× (capped at a maximum), making the memory meaningfully harder to forget going forward. Deliberately never triggered by mere retrieval — only by confirmed use — because reinforcing on exposure alone would create a self-reinforcing loop where popular memories rank higher, get shown more, get reinforced just from being seen, and rank even higher still, regardless of whether they were ever actually useful.",
+  },
 ];
 
 type InfoModal = "about" | "formulas" | "neuroscience" | null;
