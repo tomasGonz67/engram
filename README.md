@@ -1,4 +1,4 @@
-# Engram
+# Masi Memory
 
 A biologically inspired memory system for AI. A simplified model of human memory incorporating principles from cognitive science such as decay, reinforcement, and consolidation, translated into practical algorithms for long-term AI memory.
 
@@ -10,7 +10,7 @@ An engram is the physical and functional trace a memory leaves in the brain — 
 
 Build a memory system for AI that stores and retrieves information in a non-uniform way — where memories have varying strength, stability, and relevance over time, rather than being treated equally.
 
-Engram is not intended to simulate the brain exactly. Instead, it adapts well-established principles from neuroscience and cognitive science into practical mechanisms for long-term memory in AI systems.
+Masi Memory is not intended to simulate the brain exactly. Instead, it adapts well-established principles from neuroscience and cognitive science into practical mechanisms for long-term memory in AI systems.
 
 ## Core Memory Principles
 

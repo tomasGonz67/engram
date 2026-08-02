@@ -84,7 +84,7 @@ Would become `POST /memories/{id}/use` (a thin route wrapping this same function
 |-------|--------------|
 | `text` | The user's query (required) |
 | `limit` | How many memories `search_memories()` should retrieve (default 5, must be >= 1) |
-| `recent_turns` | Caller-supplied short-term conversation context (`{role, content}` list, `role` restricted to `"user"`/`"assistant"` — a plain unconstrained `str` used to let a caller inject a `"system"`-role message straight into the prompt sent to the model, see `security-preventions.md`'s Resolved section) — Engram has no session concept of its own, so the caller tracks and passes this in; see `architecture.md`'s statelessness note. No size limit enforced server-side (still true — see `security-preventions.md`'s "To Add"); the frontend caller currently caps this at the last 20 messages before sending — see `techStack.md`'s "React + Vite (Frontend)" section |
+| `recent_turns` | Caller-supplied short-term conversation context (`{role, content}` list, `role` restricted to `"user"`/`"assistant"` — a plain unconstrained `str` used to let a caller inject a `"system"`-role message straight into the prompt sent to the model, see `security-preventions.md`'s Resolved section) — Masi Memory has no session concept of its own, so the caller tracks and passes this in; see `architecture.md`'s statelessness note. No size limit enforced server-side (still true — see `security-preventions.md`'s "To Add"); the frontend caller currently caps this at the last 20 messages before sending — see `techStack.md`'s "React + Vite (Frontend)" section |
 
 **Generate response** `POST /generate`
 

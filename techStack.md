@@ -80,7 +80,7 @@ External LLM API. Handles the "AG" (generation) half of RAG — takes the query,
 - Gemini 2.5 Flash Lite — cheapest raw pricing, but ruled out over the Oct 2026 shutdown
 - GPT-5 mini (previous OpenAI generation) — superseded by GPT-5.4 Nano on both cost and tool-calling
 
-**Statelessness:** like every LLM chat API, each call is independent — nothing is retained between requests. Engram reconstructs the relevant context (system prompt + retrieved memories + a small bounded window of recent turns) and resends it in full on every generation call. This is exactly why the Qdrant/Postgres layer exists as a separate system — the LLM itself has no persistent memory to lean on.
+**Statelessness:** like every LLM chat API, each call is independent — nothing is retained between requests. Masi Memory reconstructs the relevant context (system prompt + retrieved memories + a small bounded window of recent turns) and resends it in full on every generation call. This is exactly why the Qdrant/Postgres layer exists as a separate system — the LLM itself has no persistent memory to lean on.
 
 ---
 
@@ -99,5 +99,5 @@ Single-page chat interface in `frontend/`. Calls `/generate` directly — no ser
 
 **Analytics panel**: alongside the chat, each message gets its own card showing that query's real retrieval/generation data — every retrieved memory's `semantic`/`retrievability`/`frequency`/`final_score` plus the raw `stability`/`use_count`/`age_days`/`impact` values behind them, and a "reinforced" tag on whichever ones the model actually cited (cross-referencing `reinforced_memory_ids` against `retrieved`). This is the actual reason those raw fields were added to `search_memories()`'s response (see `dataModel.md`) — no new endpoints needed, `/generate` already returned everything required. Observed in practice that the model's tool-calling isn't perfectly consistent — the same or similar query can reinforce 0, 1, or all 5 retrieved memories across different runs, a real, visible instance of the tool-calling reliability tradeoff already documented under "Why GPT-5.4 Nano" above.
 
-**Header info buttons** (About / Formulas / Neuroscience): static reference content — what Engram is, the actual ranking/decay/reinforcement formulas, and plain-English explanations of each stat grounded in the same reasoning already documented in `architecture.md` (the testing effect, flashbulb memories, etc.). No backend calls, just hardcoded content mirrored from the docs.
+**Header info buttons** (About / Formulas / Neuroscience): static reference content — what Masi Memory is, the actual ranking/decay/reinforcement formulas, and plain-English explanations of each stat grounded in the same reasoning already documented in `architecture.md` (the testing effect, flashbulb memories, etc.). No backend calls, just hardcoded content mirrored from the docs.
 

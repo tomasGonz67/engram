@@ -1,6 +1,6 @@
-# Engram Frontend
+# Masi Memory Frontend
 
-React + Vite chat interface for Engram. See the repo root's `techStack.md` for why React + Vite (not Next.js), and `DEVELOPMENT.md` for how to run it.
+React + Vite chat interface for Masi Memory. See the repo root's `techStack.md` for why React + Vite (not Next.js), and `DEVELOPMENT.md` for how to run it.
 
 ## Structure
 

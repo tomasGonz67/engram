@@ -13,7 +13,7 @@ def _create_completion(**kwargs):
     this, any OpenAI-side failure (rate limit, timeout, outage, or a request
     OpenAI itself rejects) raises uncaught and becomes an opaque 500 — this
     turns it into a clean 502, since the failure is in the upstream
-    dependency, not Engram's own code. See security-preventions.md."""
+    dependency, not Masi Memory's own code. See security-preventions.md."""
     try:
         return openai_client.chat.completions.create(**kwargs)
     except openai.APIError as e:

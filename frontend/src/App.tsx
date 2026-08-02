@@ -47,7 +47,7 @@ function safeToFixed(value: unknown, decimals: number): string {
 }
 
 const ABOUT_TEXT =
-  "Engram is a biologically inspired memory system for AI — a simplified " +
+  "Masi Memory is a biologically inspired memory system for AI — a simplified " +
   "model of human memory that incorporates real cognitive science " +
   "principles (decay, reinforcement, consolidation) into practical " +
   "algorithms for long-term AI memory, instead of just storing and " +
@@ -153,7 +153,7 @@ function App() {
     } catch {
       setMessages((current) => [
         ...current,
-        { role: "assistant", content: "Something went wrong reaching Engram." },
+        { role: "assistant", content: "Something went wrong reaching Masi Memory." },
       ]);
     } finally {
       setLoading(false);
@@ -166,7 +166,7 @@ function App() {
     <div id="app">
       <header id="header">
         <div id="header-title">
-          <h2>Engram</h2>
+          <h2>Masi Memory</h2>
           <p>A biologically inspired memory system for AI</p>
         </div>
         <div id="header-buttons">
@@ -195,7 +195,7 @@ function App() {
           <form id="chat-input" onSubmit={sendMessage}>
             <input
               type="text"
-              placeholder="Ask Engram something..."
+              placeholder="Ask Masi Memory something..."
               value={input}
               onChange={(e) => setInput(e.target.value)}
             />

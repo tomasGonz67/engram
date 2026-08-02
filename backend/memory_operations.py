@@ -33,7 +33,7 @@ def consolidate():
     rather than treating every memory's decay uniformly. See
     architecture.md's Consolidation section.
 
-    Not an HTTP route — Engram has no auth by design, and this is
+    Not an HTTP route — Masi Memory has no auth by design, and this is
     destructive, so it only runs from the background loop in main.py's
     lifespan. Returns the list of deleted ids."""
     memories = get_all_memories()

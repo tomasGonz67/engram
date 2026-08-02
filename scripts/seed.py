@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Seeds the running Engram API with mock memories, for testing search/ranking
+Seeds the running Masi Memory API with mock memories, for testing search/ranking
 at a more realistic scale. Talks to the real HTTP API (POST /memories) —
 same code path a real client would use, not a shortcut around the system.
 
