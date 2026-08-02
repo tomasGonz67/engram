@@ -67,12 +67,16 @@ const FORMULAS = [
 
 const NEUROSCIENCE_TERMS = [
   {
-    term: "semantic",
-    explanation: "How closely this memory's meaning matches your question — pure vector similarity, nothing else.",
+    term: "impact",
+    explanation: "How significant this memory seemed when first stored. Higher-impact memories resist decay longer even before being reinforced — loosely modeling how emotionally significant moments (\"flashbulb memories\") tend to be remembered more durably.",
   },
   {
     term: "stability",
     explanation: "How resistant this memory is to being forgotten. Starts based on how significant it seemed when created, and grows every time it's genuinely relied on — like a synapse strengthening from real use, not just being glanced at.",
+  },
+  {
+    term: "semantic",
+    explanation: "How closely this memory's meaning matches your question — pure vector similarity, nothing else.",
   },
   {
     term: "age_days",
@@ -93,10 +97,6 @@ const NEUROSCIENCE_TERMS = [
   {
     term: "final_score",
     explanation: "The combined ranking score memories are actually sorted by — mostly semantic similarity (75%), with smaller contributions from retrievability (15%) and frequency (10%). A weighted sum rather than a product, deliberately, so one weak signal (like a brand-new, never-used memory) can't zero out an otherwise strong match.",
-  },
-  {
-    term: "impact",
-    explanation: "How significant this memory seemed when first stored. Higher-impact memories resist decay longer even before being reinforced — loosely modeling how emotionally significant moments (\"flashbulb memories\") tend to be remembered more durably.",
   },
   {
     term: "reinforcement",
@@ -177,7 +177,7 @@ function App() {
             Formulas
           </button>
           <button type="button" onClick={() => setInfoModal("neuroscience")}>
-            Neuroscience
+            Terms
           </button>
         </div>
       </header>
@@ -242,18 +242,22 @@ function App() {
               {openEntry.retrieved.map((m) => (
                 <div className="memory-row" key={m.id}>
                   <p className="memory-text">"{m.text}"</p>
-                  {openEntry.reinforcedIds.includes(m.id) && (
-                    <span className="reinforced-tag">reinforced</span>
-                  )}
                   <div className="memory-scores">
-                    <span>semantic: {safeToFixed(m.semantic, 2)}</span>
-                    <span>retrievability: {safeToFixed(m.retrievability, 2)}</span>
-                    <span>frequency: {safeToFixed(m.frequency, 2)}</span>
-                    <span>final_score: {safeToFixed(m.final_score, 2)}</span>
                     <span>stability: {safeToFixed(m.stability, 2)}</span>
                     <span>use_count: {typeof m.use_count === "number" ? m.use_count : "?"}</span>
                     <span>age_days: {safeToFixed(m.age_days, 2)}</span>
                     <span>impact: {safeToFixed(m.impact, 2)}</span>
+                  </div>
+                  <div className="memory-scores">
+                    <span>semantic: {safeToFixed(m.semantic, 2)}</span>
+                    <span>retrievability: {safeToFixed(m.retrievability, 2)}</span>
+                    <span>frequency: {safeToFixed(m.frequency, 2)}</span>
+                  </div>
+                  <div className="memory-final-row">
+                    <span>final_score: {safeToFixed(m.final_score, 2)}</span>
+                    {openEntry.reinforcedIds.includes(m.id) && (
+                      <span className="reinforced-tag">reinforced</span>
+                    )}
                   </div>
                 </div>
               ))}
@@ -269,7 +273,7 @@ function App() {
               <h3>
                 {infoModal === "about" && "About"}
                 {infoModal === "formulas" && "Formulas"}
-                {infoModal === "neuroscience" && "Neuroscience"}
+                {infoModal === "neuroscience" && "Terms"}
               </h3>
               <button type="button" className="modal-close" onClick={() => setInfoModal(null)}>
                 ✕
