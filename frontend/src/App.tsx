@@ -39,6 +39,13 @@ type AnalyticsEntry = {
   reinforcedIds: string[];
 };
 
+// Guards the modal's stat rendering against a field that's missing or the
+// wrong type — no known way to trigger this today, purely defensive against
+// an unexpected /generate response shape.
+function safeToFixed(value: unknown, decimals: number): string {
+  return typeof value === "number" ? value.toFixed(decimals) : "?";
+}
+
 const ABOUT_TEXT =
   "Engram is a biologically inspired memory system for AI — a simplified " +
   "model of human memory that incorporates real cognitive science " +
@@ -134,8 +141,13 @@ function App() {
         ...current,
         {
           query: text,
-          retrieved: data.retrieved,
-          reinforcedIds: data.reinforced_memory_ids,
+          // Guard against an unexpected response shape — falls back to
+          // empty arrays rather than storing something the modal's
+          // .map()/.includes() calls would later crash on.
+          retrieved: Array.isArray(data.retrieved) ? data.retrieved : [],
+          reinforcedIds: Array.isArray(data.reinforced_memory_ids)
+            ? data.reinforced_memory_ids
+            : [],
         },
       ]);
     } catch {
@@ -234,14 +246,14 @@ function App() {
                     <span className="reinforced-tag">reinforced</span>
                   )}
                   <div className="memory-scores">
-                    <span>semantic: {m.semantic.toFixed(2)}</span>
-                    <span>retrievability: {m.retrievability.toFixed(2)}</span>
-                    <span>frequency: {m.frequency.toFixed(2)}</span>
-                    <span>final_score: {m.final_score.toFixed(2)}</span>
-                    <span>stability: {m.stability.toFixed(2)}</span>
-                    <span>use_count: {m.use_count}</span>
-                    <span>age_days: {m.age_days.toFixed(2)}</span>
-                    <span>impact: {m.impact.toFixed(2)}</span>
+                    <span>semantic: {safeToFixed(m.semantic, 2)}</span>
+                    <span>retrievability: {safeToFixed(m.retrievability, 2)}</span>
+                    <span>frequency: {safeToFixed(m.frequency, 2)}</span>
+                    <span>final_score: {safeToFixed(m.final_score, 2)}</span>
+                    <span>stability: {safeToFixed(m.stability, 2)}</span>
+                    <span>use_count: {typeof m.use_count === "number" ? m.use_count : "?"}</span>
+                    <span>age_days: {safeToFixed(m.age_days, 2)}</span>
+                    <span>impact: {safeToFixed(m.impact, 2)}</span>
                   </div>
                 </div>
               ))}

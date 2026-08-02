@@ -20,3 +20,7 @@ Engram is not intended to simulate the brain exactly. Instead, it adapts well-es
 - **Weighted Retrieval** — memory ranking combines semantic similarity, retrievability (which itself accounts for strength and recency), and how often a memory has actually been used
 
 See `architecture.md` for the full formulas and reasoning behind each principle.
+
+## Frontend
+
+A React + Vite chat UI lives in `frontend/` — talks to the backend's `/generate` endpoint and shows a live analytics panel with the real retrieval/ranking/reinforcement data behind each answer. See `frontend/README.md` for why it's a single-file component, and `DEVELOPMENT.md` for how to run it.

@@ -1,11 +1,23 @@
 import json
-from fastapi import APIRouter
+import openai
+from fastapi import APIRouter, HTTPException
 from models import GenerateInput
-from database import openai_client, GENERATION_MODEL
+from database import openai_client, GENERATION_MODEL, normalize_id
 from routers.memories import search_memories
 from memory_operations import reinforce_memory
 
 router = APIRouter()
+
+def _create_completion(**kwargs):
+    """Wraps the two chat.completions.create() call sites below. Without
+    this, any OpenAI-side failure (rate limit, timeout, outage, or a request
+    OpenAI itself rejects) raises uncaught and becomes an opaque 500 — this
+    turns it into a clean 502, since the failure is in the upstream
+    dependency, not Engram's own code. See security-preventions.md."""
+    try:
+        return openai_client.chat.completions.create(**kwargs)
+    except openai.APIError as e:
+        raise HTTPException(status_code=502, detail=f"Generation service unavailable: {e}") from e
 
 SYSTEM_PROMPT = (
     "You are Engram's assistant. Use the retrieved memories below as your "
@@ -41,7 +53,7 @@ def generate(body: GenerateInput):
         messages.append({"role": turn.role, "content": turn.content})
     messages.append({"role": "user", "content": body.text})
 
-    response = openai_client.chat.completions.create(
+    response = _create_completion(
         model=GENERATION_MODEL,
         messages=messages,
         tools=[REINFORCE_TOOL],
@@ -68,9 +80,18 @@ def generate(body: GenerateInput):
             if call.function.name == "reinforce_memory":
                 try:
                     args = json.loads(call.function.arguments)
-                    normalized_id = reinforce_memory(args["id"])
-                    reinforced_ids.append(normalized_id)
-                    result = "reinforced"
+                    normalized_id = normalize_id(args["id"])
+                    if normalized_id in reinforced_ids:
+                        # Same id called twice in one turn — reinforce_memory
+                        # isn't idempotent (each call multiplies stability by
+                        # REINFORCEMENT_MULTIPLIER again), so a repeat call
+                        # must be skipped rather than applied a second time
+                        # for what's really one turn's worth of "used this."
+                        result = "already reinforced this turn, skipped"
+                    else:
+                        reinforce_memory(normalized_id)
+                        reinforced_ids.append(normalized_id)
+                        result = "reinforced"
                 except (ValueError, KeyError):
                     # ValueError: malformed JSON, or a hallucinated/nonexistent
                     # id. KeyError: well-formed JSON missing "id" entirely.
@@ -86,7 +107,7 @@ def generate(body: GenerateInput):
         # Second call so the model can produce a final natural-language
         # answer now that its tool calls have results — the first response
         # often has no content when tool_calls are present.
-        response = openai_client.chat.completions.create(
+        response = _create_completion(
             model=GENERATION_MODEL,
             messages=messages,
         )

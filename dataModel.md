@@ -84,12 +84,14 @@ Would become `POST /memories/{id}/use` (a thin route wrapping this same function
 |-------|--------------|
 | `text` | The user's query (required) |
 | `limit` | How many memories `search_memories()` should retrieve (default 5, must be >= 1) |
-| `recent_turns` | Caller-supplied short-term conversation context (`{role, content}` list) — Engram has no session concept of its own, so the caller tracks and passes this in; see `architecture.md`'s statelessness note. No size limit enforced server-side; the frontend caller currently caps this at the last 20 messages before sending — see `techStack.md`'s "React + Vite (Frontend)" section |
+| `recent_turns` | Caller-supplied short-term conversation context (`{role, content}` list, `role` restricted to `"user"`/`"assistant"` — a plain unconstrained `str` used to let a caller inject a `"system"`-role message straight into the prompt sent to the model, see `security-preventions.md`'s Resolved section) — Engram has no session concept of its own, so the caller tracks and passes this in; see `architecture.md`'s statelessness note. No size limit enforced server-side (still true — see `security-preventions.md`'s "To Add"); the frontend caller currently caps this at the last 20 messages before sending — see `techStack.md`'s "React + Vite (Frontend)" section |
 
 **Generate response** `POST /generate`
 
 | Field | Description |
 |-------|--------------|
 | `answer` | The model's final natural-language answer |
-| `reinforced_memory_ids` | IDs of memories the model actually called `reinforce_memory` on — a subset of (or none of) `retrieved` |
+| `reinforced_memory_ids` | IDs of memories the model actually called `reinforce_memory` on and that resulted in a real reinforcement — a subset of (or none of) `retrieved`. If the model calls the tool more than once for the same id in one turn, only the first counts; repeats are deduped, not double-reinforced (see `architecture.md`'s "How Generation Works") |
 | `retrieved` | `search_memories()`'s raw return value — always an array, even if empty. Not the same as `/memories/search`'s HTTP response, which wraps an empty result in `{"message": "No valid memories found"}` instead; `/generate` has no equivalent wrapper. Included so the caller can see what was available even if the model didn't use all of it |
+
+**Generate error response** — a `422` (malformed request, e.g. an invalid `recent_turns[].role`) follows FastAPI/Pydantic's standard validation-error shape. A `502` means the request itself was valid but the upstream OpenAI call failed (rate limit, timeout, outage) — see `security-preventions.md`'s Resolved section.
