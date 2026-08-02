@@ -47,8 +47,12 @@ const ABOUT_TEXT =
   "replaying text verbatim.";
 
 const FORMULAS = [
+  { name: "Impact (set at creation)", formula: "impact = clamp(provided_impact, 0.5, 2.0)" },
   { name: "Initial stability (at creation)", formula: "stability = BASE_STABILITY × impact" },
+  { name: "Semantic similarity", formula: "semantic = (raw_cosine_similarity + 1) / 2" },
+  { name: "Age", formula: "age_days = days since last_reinforced_at" },
   { name: "Retrievability (computed live, never stored)", formula: "retrievability = (1 + age_days / stability) ^ -0.5" },
+  { name: "Use count", formula: "use_count += 1 (on each confirmed reinforcement)" },
   { name: "Frequency", formula: "frequency = 1 - exp(-use_count / 5)" },
   { name: "Ranking score", formula: "final_score = 0.75×semantic + 0.15×retrievability + 0.10×frequency" },
   { name: "On reinforcement", formula: "stability = min(stability × 1.2, MAX_STABILITY)" },
@@ -64,6 +68,10 @@ const NEUROSCIENCE_TERMS = [
     explanation: "How resistant this memory is to being forgotten. Starts based on how significant it seemed when created, and grows every time it's genuinely relied on — like a synapse strengthening from real use, not just being glanced at.",
   },
   {
+    term: "age_days",
+    explanation: "How many days it's been since this memory was last reinforced. Feeds directly into retrievability — the longer it's been, the more retrievability decays, unless reinforcement resets the clock.",
+  },
+  {
     term: "retrievability",
     explanation: "How \"available\" this memory is right now, based on its stability and how long it's been since it was last used. Fades over time if untouched, modeling the brain's natural forgetting curve.",
   },
@@ -74,6 +82,10 @@ const NEUROSCIENCE_TERMS = [
   {
     term: "frequency",
     explanation: "A score derived from use_count that feeds into ranking — how often this memory has proven genuinely useful.",
+  },
+  {
+    term: "final_score",
+    explanation: "The combined ranking score memories are actually sorted by — mostly semantic similarity (75%), with smaller contributions from retrievability (15%) and frequency (10%). A weighted sum rather than a product, deliberately, so one weak signal (like a brand-new, never-used memory) can't zero out an otherwise strong match.",
   },
   {
     term: "impact",
