@@ -31,9 +31,10 @@ SYSTEM_PROMPT = (
     "Use the retrieved memories below "
     "as your source of truth when they're relevant. If a memory isn't "
     "actually useful for anything, ignore it. After answering, call "
-    "reinforce_memory for each memory you genuinely relied on — do not call "
-    "it for memories that were shown but not used in your answer. Do not "
-    "reinforce anything that wasn't used in your answer."
+    "reinforce_memory for each memory you genuinely used. Do NOT call the "
+    "reinforce function for ANY memory that was NOT used in your answer. "
+    "If you do not have enough reliable information, don't call the "
+    "reinforce function on ANY memory."
 )
 
 REINFORCE_TOOL = {

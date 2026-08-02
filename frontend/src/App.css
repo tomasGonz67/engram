@@ -75,6 +75,7 @@
 
 #chat-panel {
   width: 50%;
+  min-height: 0;
   display: flex;
   flex-direction: column;
   border-right: 1px solid var(--border);
@@ -152,6 +153,7 @@
 
 #analytics-panel {
   width: 50%;
+  min-height: 0;
   overflow-y: auto;
 }
 
