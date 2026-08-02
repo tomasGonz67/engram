@@ -80,7 +80,7 @@ Would become `POST /memories/{id}/use` (a thin route wrapping this same function
 |-------|--------------|
 | `text` | The user's query (required) |
 | `limit` | How many memories `search_memories()` should retrieve (default 5, must be >= 1) |
-| `recent_turns` | Caller-supplied short-term conversation context (`{role, content}` list) — Engram has no session concept of its own, so the caller tracks and passes this in; see `architecture.md`'s statelessness note |
+| `recent_turns` | Caller-supplied short-term conversation context (`{role, content}` list) — Engram has no session concept of its own, so the caller tracks and passes this in; see `architecture.md`'s statelessness note. No size limit enforced server-side; the frontend caller currently caps this at the last 20 messages before sending — see `techStack.md`'s "React + Vite (Frontend)" section |
 
 **Generate response** `POST /generate`
 

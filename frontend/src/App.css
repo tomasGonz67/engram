@@ -32,6 +32,29 @@
   flex-grow: 1;
   overflow-y: auto;
   padding: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.message {
+  max-width: 70%;
+  padding: 10px 14px;
+  border-radius: 10px;
+  text-align: left;
+  white-space: pre-wrap;
+}
+
+.message.user {
+  align-self: flex-end;
+  color: var(--accent);
+  background: var(--accent-bg);
+}
+
+.message.assistant {
+  align-self: flex-start;
+  color: var(--text-h);
+  background: var(--code-bg);
 }
 
 #chat-input {

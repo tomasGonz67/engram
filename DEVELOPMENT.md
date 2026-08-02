@@ -22,6 +22,20 @@ docker compose -f docker-compose-dev.yml up -d
 docker compose -f docker-compose-dev.yml down
 ```
 
+## Frontend
+
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+| Service | URL |
+|---------|-----|
+| Frontend | http://localhost:5173 |
+
+Requires the backend already running (see above) — the frontend calls it via `VITE_API_URL` (defaults to `http://localhost:8000`).
+
 ## Scripts
 
 See `scripts.md` for utility scripts (`scripts/clear.sh`, `scripts/seed.py`).

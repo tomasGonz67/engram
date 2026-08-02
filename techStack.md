@@ -82,3 +82,18 @@ External LLM API. Handles the "AG" (generation) half of RAG — takes the query,
 
 **Statelessness:** like every LLM chat API, each call is independent — nothing is retained between requests. Engram reconstructs the relevant context (system prompt + retrieved memories + a small bounded window of recent turns) and resends it in full on every generation call. This is exactly why the Qdrant/Postgres layer exists as a separate system — the LLM itself has no persistent memory to lean on.
 
+---
+
+## React + Vite (Frontend)
+Single-page chat interface in `frontend/`. Calls `/generate` directly — no server-side rendering, no backend logic of its own, since the actual backend already exists separately.
+
+**Why React + Vite, not Next.js:**
+- No SEO needs — a personal chat tool, not public marketing content
+- No server-side rendering needs — just a UI hitting an existing API
+- No Route Handlers needed — all backend logic already lives in the separate FastAPI backend; the frontend only ever calls it
+- Builds to pure static files with no framework-specific adapter needed for Cloudflare Pages (see `prod.md`) — Next.js would've needed `@cloudflare/next-on-pages`, which has real compatibility gaps (e.g. `firebase-admin` doesn't work on Cloudflare Workers at all)
+
+**CORS**: the backend's `CORSMiddleware` (see `security-preventions.md`) is what makes cross-origin calls from the frontend possible at all — configurable via `ALLOWED_ORIGINS`, defaults to the Vite dev server (`http://localhost:5173`).
+
+**Sliding window for `recent_turns`**: the frontend caps what it sends to `/generate` at the last 20 messages (`RECENT_TURNS_LIMIT` in `App.tsx`), not the full conversation history. Not primarily a cost decision — at this project's usage scale a full 20-message conversation costs about $0.0015, negligible either way. The real reasons: avoiding "lost in the middle" quality degradation on unusually long conversations, and staying nowhere near GPT-5.4 Nano's 400K token context ceiling. 20 was chosen because it roughly matches typical conversation length, so it rarely triggers for normal use — it's a ceiling for the runaway case, not a constraint on typical usage.
+
