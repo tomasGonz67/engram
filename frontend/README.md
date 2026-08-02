@@ -1,32 +1,9 @@
-# React + TypeScript + Vite
+# Engram Frontend
 
-This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
+React + Vite chat interface for Engram. See the repo root's `techStack.md` for why React + Vite (not Next.js), and `DEVELOPMENT.md` for how to run it.
 
-Currently, two official plugins are available:
+## Structure
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+Everything lives in one file — `src/App.tsx`. No separate component files for the chat panel, analytics panel, or modals.
 
-## React Compiler
-
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
-
-## Expanding the Oxlint configuration
-
-If you are developing a production application, we recommend enabling type-aware lint rules by installing `oxlint-tsgolint` and editing `.oxlintrc.json`:
-
-```json
-{
-  "$schema": "./node_modules/oxlint/configuration_schema.json",
-  "plugins": ["react", "typescript", "oxc"],
-  "options": {
-    "typeAware": true
-  },
-  "rules": {
-    "react/rules-of-hooks": "error",
-    "react/only-export-components": ["warn", { "allowConstantExport": true }]
-  }
-}
-```
-
-See the [Oxlint rules documentation](https://oxc.rs/docs/guide/usage/linter/rules) for the full list of rules and categories.
+This is deliberate, not an oversight. The app itself is genuinely simple — a chat interface, an analytics side panel, a couple of static info modals — and splitting that into a full component architecture (separate files, prop drilling or context, shared state management) would add structure this project doesn't need yet. One file that's easy to read top to bottom beats a folder of components for something this size. Matches the same reasoning already used for the backend: structure expands as complexity actually justifies it, not before. If this file ever gets genuinely hard to navigate, that's the point to split it — not now.
