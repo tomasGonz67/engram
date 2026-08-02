@@ -83,6 +83,15 @@ def search_memories(text: str, limit: int):
             "retrievability": retrievability,
             "frequency": frequency,
             "final_score": final_score,
+            # Raw values below aren't part of final_score's weighted sum
+            # (retrievability/frequency, the computed values above, are what
+            # actually feed it) — included purely so callers (e.g. an
+            # analytics UI) can show the underlying numbers, not just the
+            # derived scores.
+            "stability": meta["stability"],
+            "use_count": meta["use_count"],
+            "age_days": age_days,
+            "impact": meta["impact"],
         })
 
     ranked.sort(key=lambda r: r["final_score"], reverse=True)

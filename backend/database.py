@@ -64,23 +64,26 @@ def insert_memory(id: str, text: str, impact: float, stability: float):
         conn.close()
 
 def get_memories_metadata(ids: list[str]) -> dict:
-    """Fetch stability, use_count, and last_reinforced_at for a set of memory IDs.
-    Returns a dict keyed by id string for easy lookup. Plain read — no computation,
-    no business logic; the caller (router) turns these into retrievability/frequency."""
+    """Fetch stability, use_count, last_reinforced_at, and impact for a set of
+    memory IDs. Returns a dict keyed by id string for easy lookup. Plain read
+    — no computation, no business logic; the caller (router) turns stability/
+    use_count/last_reinforced_at into retrievability/frequency. impact is
+    returned as-is (raw, not part of the ranking formula) purely for
+    surfacing in API responses — see search_memories()."""
     ids = [normalize_id(id) for id in ids]
     conn = get_pg_conn()
     try:
         with conn:
             with conn.cursor() as cur:
                 cur.execute(
-                    "SELECT id, stability, use_count, last_reinforced_at FROM memories WHERE id = ANY(%s::uuid[])",
+                    "SELECT id, stability, use_count, last_reinforced_at, impact FROM memories WHERE id = ANY(%s::uuid[])",
                     (ids,)
                 )
                 rows = cur.fetchall()
     finally:
         conn.close()
     return {
-        str(row[0]): {"stability": row[1], "use_count": row[2], "last_reinforced_at": row[3]}
+        str(row[0]): {"stability": row[1], "use_count": row[2], "last_reinforced_at": row[3], "impact": row[4]}
         for row in rows
     }
 

@@ -19,6 +19,7 @@ function App() {
   const [messages, setMessages] = useState<Turn[]>([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
+  const [showModal, setShowModal] = useState(false);
 
   async function sendMessage(e: React.FormEvent) {
     e.preventDefault();
@@ -84,9 +85,50 @@ function App() {
         </section>
 
         <section id="analytics-panel">
-          <div id="analytics-history">Analytics history</div>
+          <div id="analytics-history">
+            <div className="analytics-card">
+              <p>Analytics for message: "what was the last thing you said?"</p>
+              <button type="button" onClick={() => setShowModal(true)}>
+                Show Analytics
+              </button>
+            </div>
+          </div>
         </section>
       </div>
+
+      {showModal && (
+        <div className="modal-backdrop" onClick={() => setShowModal(false)}>
+          <div className="modal" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3>Analytics</h3>
+              <button type="button" className="modal-close" onClick={() => setShowModal(false)}>
+                ✕
+              </button>
+            </div>
+            <div className="modal-body">
+              <div className="memory-row">
+                <p className="memory-text">"Met my girlfriend playing Toontown years ago"</p>
+                <span className="reinforced-tag">reinforced</span>
+                <div className="memory-scores">
+                  <span>semantic: 0.81</span>
+                  <span>retrievability: 0.99</span>
+                  <span>frequency: 0.33</span>
+                  <span>final_score: 0.79</span>
+                </div>
+              </div>
+              <div className="memory-row">
+                <p className="memory-text">"Played Roblox with my girlfriend for hours today"</p>
+                <div className="memory-scores">
+                  <span>semantic: 0.76</span>
+                  <span>retrievability: 0.96</span>
+                  <span>frequency: 0.18</span>
+                  <span>final_score: 0.72</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

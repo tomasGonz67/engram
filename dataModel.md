@@ -61,6 +61,10 @@ Qdrant handles semantic search — returns IDs of the most similar vectors. Post
 | `retrievability` | `(1 + age_days / stability)^-0.5`, computed from this memory's `stability` and time since `last_reinforced_at` |
 | `frequency` | `1 - exp(-use_count / 5)` |
 | `final_score` | `0.75×semantic + 0.15×retrievability + 0.10×frequency` — what results are actually sorted by |
+| `stability` | Raw value underlying `retrievability` — not itself part of `final_score`'s weighted sum (the computed `retrievability` is). Included for callers that want to show the underlying numbers, e.g. an analytics UI |
+| `use_count` | Raw value underlying `frequency`, same reasoning — included for display, not used directly in ranking |
+| `age_days` | Days since `last_reinforced_at`, computed server-side and fed into `retrievability` — included as-is since it's more directly readable than a raw timestamp |
+| `impact` | The memory's `impact` value (0.5–2.0) from creation — plays no role in ranking at all (only seeds initial `stability`, see `architecture.md`'s "On creation" section), included purely for display |
 
 This is a deliberately verbose response — kept as separate fields rather than collapsing to a single `score` so each signal can be inspected/verified independently. May collapse to just `{id, text, score}` later once the formula (particularly `SEMANTIC_THRESHOLD`, still an unvalidated placeholder — see `constants.py`) is trusted enough not to need per-request visibility into its components.
 
