@@ -10,16 +10,86 @@ const API_URL = import.meta.env.VITE_API_URL ?? "http://localhost:8000";
 // GPT-5.4 Nano's 400K token context ceiling.
 const RECENT_TURNS_LIMIT = 20;
 
+// Mirrors backend/constants.py's SEMANTIC_THRESHOLD — not returned by the
+// API (it's a fixed config value, not per-request data), so hardcoded here
+// purely for display in the analytics modal.
+const SEMANTIC_THRESHOLD = 0.75;
+
 type Turn = {
   role: "user" | "assistant";
   content: string;
 };
 
+type RetrievedMemory = {
+  id: string;
+  text: string;
+  semantic: number;
+  retrievability: number;
+  frequency: number;
+  final_score: number;
+  stability: number;
+  use_count: number;
+  age_days: number;
+  impact: number;
+};
+
+type AnalyticsEntry = {
+  query: string;
+  retrieved: RetrievedMemory[];
+  reinforcedIds: string[];
+};
+
+const ABOUT_TEXT =
+  "Engram is a biologically inspired memory system for AI — a simplified " +
+  "model of human memory that incorporates real cognitive science " +
+  "principles (decay, reinforcement, consolidation) into practical " +
+  "algorithms for long-term AI memory, instead of just storing and " +
+  "replaying text verbatim.";
+
+const FORMULAS = [
+  { name: "Initial stability (at creation)", formula: "stability = BASE_STABILITY × impact" },
+  { name: "Retrievability (computed live, never stored)", formula: "retrievability = (1 + age_days / stability) ^ -0.5" },
+  { name: "Frequency", formula: "frequency = 1 - exp(-use_count / 5)" },
+  { name: "Ranking score", formula: "final_score = 0.75×semantic + 0.15×retrievability + 0.10×frequency" },
+  { name: "On reinforcement", formula: "stability = min(stability × 1.2, MAX_STABILITY)" },
+];
+
+const NEUROSCIENCE_TERMS = [
+  {
+    term: "semantic",
+    explanation: "How closely this memory's meaning matches your question — pure vector similarity, nothing else.",
+  },
+  {
+    term: "stability",
+    explanation: "How resistant this memory is to being forgotten. Starts based on how significant it seemed when created, and grows every time it's genuinely relied on — like a synapse strengthening from real use, not just being glanced at.",
+  },
+  {
+    term: "retrievability",
+    explanation: "How \"available\" this memory is right now, based on its stability and how long it's been since it was last used. Fades over time if untouched, modeling the brain's natural forgetting curve.",
+  },
+  {
+    term: "use_count",
+    explanation: "How many times this memory was actually relied on to answer something, not just shown as a candidate. Grounded in the \"testing effect\": genuinely using information strengthens it far more than passively re-reading it.",
+  },
+  {
+    term: "frequency",
+    explanation: "A score derived from use_count that feeds into ranking — how often this memory has proven genuinely useful.",
+  },
+  {
+    term: "impact",
+    explanation: "How significant this memory seemed when first stored. Higher-impact memories resist decay longer even before being reinforced — loosely modeling how emotionally significant moments (\"flashbulb memories\") tend to be remembered more durably.",
+  },
+];
+
+type InfoModal = "about" | "formulas" | "neuroscience" | null;
+
 function App() {
   const [messages, setMessages] = useState<Turn[]>([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
-  const [showModal, setShowModal] = useState(false);
+  const [analyticsEntries, setAnalyticsEntries] = useState<AnalyticsEntry[]>([]);
+  const [openModalIndex, setOpenModalIndex] = useState<number | null>(null);
+  const [infoModal, setInfoModal] = useState<InfoModal>(null);
 
   async function sendMessage(e: React.FormEvent) {
     e.preventDefault();
@@ -44,6 +114,14 @@ function App() {
 
       const data = await response.json();
       setMessages((current) => [...current, { role: "assistant", content: data.answer }]);
+      setAnalyticsEntries((current) => [
+        ...current,
+        {
+          query: text,
+          retrieved: data.retrieved,
+          reinforcedIds: data.reinforced_memory_ids,
+        },
+      ]);
     } catch {
       setMessages((current) => [
         ...current,
@@ -54,11 +132,26 @@ function App() {
     }
   }
 
+  const openEntry = openModalIndex !== null ? analyticsEntries[openModalIndex] : null;
+
   return (
     <div id="app">
       <header id="header">
-        <h2>Engram</h2>
-        <p>A biologically inspired memory system for AI</p>
+        <div id="header-title">
+          <h2>Engram</h2>
+          <p>A biologically inspired memory system for AI</p>
+        </div>
+        <div id="header-buttons">
+          <button type="button" onClick={() => setInfoModal("about")}>
+            About
+          </button>
+          <button type="button" onClick={() => setInfoModal("formulas")}>
+            Formulas
+          </button>
+          <button type="button" onClick={() => setInfoModal("neuroscience")}>
+            Neuroscience
+          </button>
+        </div>
       </header>
 
       <div id="body">
@@ -86,45 +179,92 @@ function App() {
 
         <section id="analytics-panel">
           <div id="analytics-history">
-            <div className="analytics-card">
-              <p>Analytics for message: "what was the last thing you said?"</p>
-              <button type="button" onClick={() => setShowModal(true)}>
-                Show Analytics
-              </button>
-            </div>
+            {analyticsEntries.map((entry, i) => (
+              <div className="analytics-card" key={i}>
+                <p>Analytics for message: "{entry.query}"</p>
+                <button type="button" onClick={() => setOpenModalIndex(i)}>
+                  Show Analytics
+                </button>
+              </div>
+            ))}
           </div>
         </section>
       </div>
 
-      {showModal && (
-        <div className="modal-backdrop" onClick={() => setShowModal(false)}>
+      {openEntry && (
+        <div className="modal-backdrop" onClick={() => setOpenModalIndex(null)}>
           <div className="modal" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
               <h3>Analytics</h3>
-              <button type="button" className="modal-close" onClick={() => setShowModal(false)}>
+              <button
+                type="button"
+                className="modal-close"
+                onClick={() => setOpenModalIndex(null)}
+              >
                 ✕
               </button>
             </div>
             <div className="modal-body">
-              <div className="memory-row">
-                <p className="memory-text">"Met my girlfriend playing Toontown years ago"</p>
-                <span className="reinforced-tag">reinforced</span>
-                <div className="memory-scores">
-                  <span>semantic: 0.81</span>
-                  <span>retrievability: 0.99</span>
-                  <span>frequency: 0.33</span>
-                  <span>final_score: 0.79</span>
+              <p className="threshold-note">
+                Semantic threshold: {SEMANTIC_THRESHOLD}
+              </p>
+              {openEntry.retrieved.length === 0 && (
+                <p>No memories retrieved for this message.</p>
+              )}
+              {openEntry.retrieved.map((m) => (
+                <div className="memory-row" key={m.id}>
+                  <p className="memory-text">"{m.text}"</p>
+                  {openEntry.reinforcedIds.includes(m.id) && (
+                    <span className="reinforced-tag">reinforced</span>
+                  )}
+                  <div className="memory-scores">
+                    <span>semantic: {m.semantic.toFixed(2)}</span>
+                    <span>retrievability: {m.retrievability.toFixed(2)}</span>
+                    <span>frequency: {m.frequency.toFixed(2)}</span>
+                    <span>final_score: {m.final_score.toFixed(2)}</span>
+                    <span>stability: {m.stability.toFixed(2)}</span>
+                    <span>use_count: {m.use_count}</span>
+                    <span>age_days: {m.age_days.toFixed(2)}</span>
+                    <span>impact: {m.impact.toFixed(2)}</span>
+                  </div>
                 </div>
-              </div>
-              <div className="memory-row">
-                <p className="memory-text">"Played Roblox with my girlfriend for hours today"</p>
-                <div className="memory-scores">
-                  <span>semantic: 0.76</span>
-                  <span>retrievability: 0.96</span>
-                  <span>frequency: 0.18</span>
-                  <span>final_score: 0.72</span>
-                </div>
-              </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {infoModal && (
+        <div className="modal-backdrop" onClick={() => setInfoModal(null)}>
+          <div className="modal" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3>
+                {infoModal === "about" && "About"}
+                {infoModal === "formulas" && "Formulas"}
+                {infoModal === "neuroscience" && "Neuroscience"}
+              </h3>
+              <button type="button" className="modal-close" onClick={() => setInfoModal(null)}>
+                ✕
+              </button>
+            </div>
+            <div className="modal-body">
+              {infoModal === "about" && <p>{ABOUT_TEXT}</p>}
+
+              {infoModal === "formulas" &&
+                FORMULAS.map((f) => (
+                  <div className="info-row" key={f.name}>
+                    <p className="info-term">{f.name}</p>
+                    <code>{f.formula}</code>
+                  </div>
+                ))}
+
+              {infoModal === "neuroscience" &&
+                NEUROSCIENCE_TERMS.map((t) => (
+                  <div className="info-row" key={t.term}>
+                    <p className="info-term">{t.term}</p>
+                    <p>{t.explanation}</p>
+                  </div>
+                ))}
             </div>
           </div>
         </div>
