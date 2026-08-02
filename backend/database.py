@@ -1,5 +1,6 @@
 import os
 import uuid
+from datetime import datetime, timezone
 import psycopg2
 from sentence_transformers import SentenceTransformer
 from qdrant_client import QdrantClient
@@ -50,40 +51,57 @@ CREATE TABLE IF NOT EXISTS memories (
 );
 """
 
-def insert_memory(id: str, text: str, impact: float, stability: float):
+def insert_memory(id: str, text: str, impact: float, stability: float, created_at: datetime = None, last_reinforced_at: datetime = None):
+    """created_at/last_reinforced_at are dev-only backdating hooks — None
+    (the default) means "now" for both, identical to the old DEFAULT NOW()
+    behavior. Only ever passed a real value by scripts/seed.py's backdating
+    step; never exposed through MemoryInput or the public /memories route.
+    See dataModel.md and security-preventions.md."""
     id = normalize_id(id)
+    now = datetime.now(timezone.utc)
+    created_at = created_at or now
+    last_reinforced_at = last_reinforced_at or now
     conn = get_pg_conn()
     try:
         with conn:
             with conn.cursor() as cur:
                 cur.execute(
-                    "INSERT INTO memories (id, text, impact, stability) VALUES (%s, %s, %s, %s)",
-                    (id, text, impact, stability)
+                    "INSERT INTO memories (id, text, impact, stability, created_at, last_reinforced_at) VALUES (%s, %s, %s, %s, %s, %s)",
+                    (id, text, impact, stability, created_at, last_reinforced_at)
                 )
     finally:
         conn.close()
 
 def get_memories_metadata(ids: list[str]) -> dict:
-    """Fetch stability, use_count, last_reinforced_at, and impact for a set of
-    memory IDs. Returns a dict keyed by id string for easy lookup. Plain read
-    — no computation, no business logic; the caller (router) turns stability/
-    use_count/last_reinforced_at into retrievability/frequency. impact is
-    returned as-is (raw, not part of the ranking formula) purely for
-    surfacing in API responses — see search_memories()."""
+    """Fetch stability, use_count, last_reinforced_at, impact, and created_at
+    for a set of memory IDs. Returns a dict keyed by id string for easy
+    lookup. Plain read — no computation, no business logic; the caller
+    (router) turns stability/use_count/last_reinforced_at into
+    retrievability/frequency. impact and created_at are both returned as-is
+    (raw, not part of the ranking formula) purely for surfacing in API
+    responses — see search_memories(). created_at specifically feeds
+    generate.py's prompt (via formulas.humanize_age) so the model can reason
+    about accurate elapsed time; it plays no role in ranking or decay."""
     ids = [normalize_id(id) for id in ids]
     conn = get_pg_conn()
     try:
         with conn:
             with conn.cursor() as cur:
                 cur.execute(
-                    "SELECT id, stability, use_count, last_reinforced_at, impact FROM memories WHERE id = ANY(%s::uuid[])",
+                    "SELECT id, stability, use_count, last_reinforced_at, impact, created_at FROM memories WHERE id = ANY(%s::uuid[])",
                     (ids,)
                 )
                 rows = cur.fetchall()
     finally:
         conn.close()
     return {
-        str(row[0]): {"stability": row[1], "use_count": row[2], "last_reinforced_at": row[3], "impact": row[4]}
+        str(row[0]): {
+            "stability": row[1],
+            "use_count": row[2],
+            "last_reinforced_at": row[3],
+            "impact": row[4],
+            "created_at": row[5],
+        }
         for row in rows
     }
 

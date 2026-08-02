@@ -21,3 +21,13 @@ python3 scripts/seed.py
 ```
 
 Requires the dev environment to already be running. Each memory gets a random `impact` within the valid range, so seeded data exercises impact/stability variation alongside semantic relevance and threshold filtering. Every seeded memory starts unreinforced (`use_count=0`) — reinforcement only happens through real use (`reinforce_memory()` or a `/generate` call that actually cites a memory), not from seeding itself.
+
+## `scripts/backdate.sh` — spread seeded memories across realistic ages
+
+Everything `seed.py` creates gets `created_at`/`last_reinforced_at` set to the moment it was inserted, so right after seeding, every memory looks equally "just created." Run this afterward to backdate all of them to a random point in the last 3 years instead — makes retrievability decay, Consolidation eligibility, and `/generate`'s dynamic `[time ago]` prompt marker (see `architecture.md`'s "How Generation Works") actually visible across a realistic spread, rather than everything sitting at `age_days ≈ 0`.
+
+```bash
+./scripts/backdate.sh
+```
+
+Runs a single SQL `UPDATE` directly against the dev Postgres container (`docker compose exec postgres psql`) — computes one random offset per row and applies it to both `created_at` and `last_reinforced_at` identically, matching how a never-reinforced memory's two timestamps are already equal by default. No Python or new dependencies involved; this deliberately doesn't use `store_memory()`/`insert_memory()`'s optional backdating parameters (see `techDebt.md`) since raw SQL against already-seeded rows is simpler than switching `seed.py` itself to call those functions in-process. Same dev-only `ENVIRONMENT` guard as `clear.sh`, plus it's structurally unable to reach prod regardless — prod Postgres will be Neon (see `prod.md`), not a local container, so there's no `postgres` service for this to `exec` into outside of dev.

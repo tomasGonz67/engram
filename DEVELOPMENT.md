@@ -38,4 +38,4 @@ Requires the backend already running (see above) — the frontend calls it via `
 
 ## Scripts
 
-See `scripts.md` for utility scripts (`scripts/clear.sh`, `scripts/seed.py`).
+See `scripts.md` for utility scripts (`scripts/clear.sh`, `scripts/seed.py`, `scripts/backdate.sh`).

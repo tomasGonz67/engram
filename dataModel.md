@@ -20,7 +20,7 @@ Every engram is split across two databases, connected by a UUID.
 | `stability` | float | Resistance to decay. Seeded from `impact` at creation, multiplied by `REINFORCEMENT_MULTIPLIER` (capped at `MAX_STABILITY`) on each meaningful use. There is no stored "strength"/"retrievability" column — it's computed lazily from `stability` + time elapsed, never written to the DB |
 | `retrieval_count` | int | Number of times this memory has been returned by search (shown, not necessarily used). Bookkeeping only — does not affect ranking or stability |
 | `use_count` | int | Number of times this memory was *meaningfully used* (included in an answer, explicitly selected, referenced later) — distinct from `retrieval_count` to avoid a self-reinforcing popularity loop where mere exposure strengthens a memory. Only this counter drives stability growth and the `frequency` term in ranking |
-| `created_at` | timestamptz | When the memory was first stored |
+| `created_at` | timestamptz | When the memory was first stored. Plays no role in ranking or decay (that's `last_reinforced_at`'s job) — its one use is feeding `/generate`'s prompt with an accurate, freshly-computed "time ago" marker via `formulas.humanize_age()`, see `architecture.md`'s "How Generation Works" |
 | `last_reinforced_at` | timestamptz | When the memory was last *meaningfully used* — not updated on every retrieval, only on reinforcement |
 | `memory_type` | string | Category of memory (episodic, semantic, procedural). Defaults to `general`. Classification logic not yet implemented — either user-provided or auto-classified via LLM in the future. |
 
@@ -65,6 +65,7 @@ Qdrant handles semantic search — returns IDs of the most similar vectors. Post
 | `use_count` | Raw value underlying `frequency`, same reasoning — included for display, not used directly in ranking |
 | `age_days` | Days since `last_reinforced_at`, computed server-side and fed into `retrievability` — included as-is since it's more directly readable than a raw timestamp |
 | `impact` | The memory's `impact` value (0.5–2.0) from creation — plays no role in ranking at all (only seeds initial `stability`, see `architecture.md`'s "On creation" section), included purely for display |
+| `created_at` | When the memory was first stored — raw timestamp, included for display. Plays no role in ranking; `/generate` separately converts it to a human-readable "time ago" string for the model's prompt, see `architecture.md`'s "How Generation Works" |
 
 This is a deliberately verbose response — kept as separate fields rather than collapsing to a single `score` so each signal can be inspected/verified independently. May collapse to just `{id, text, score}` later once the formula (particularly `SEMANTIC_THRESHOLD`, still an unvalidated placeholder — see `constants.py`) is trusted enough not to need per-request visibility into its components.
 

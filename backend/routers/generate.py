@@ -5,6 +5,7 @@ from models import GenerateInput
 from database import openai_client, GENERATION_MODEL, normalize_id
 from routers.memories import search_memories
 from memory_operations import reinforce_memory
+from formulas import humanize_age
 
 router = APIRouter()
 
@@ -56,7 +57,9 @@ REINFORCE_TOOL = {
 def generate(body: GenerateInput):
     retrieved = search_memories(body.text, body.limit)
 
-    memory_context = "\n".join(f"- ({m['id']}) {m['text']}" for m in retrieved) or "No relevant memories found."
+    memory_context = "\n".join(
+        f"- ({m['id']}) [{humanize_age(m['created_at'])}] {m['text']}" for m in retrieved
+    ) or "No relevant memories found."
 
     messages = [{"role": "system", "content": f"{SYSTEM_PROMPT}\n\nRetrieved memories:\n{memory_context}"}]
     for turn in body.recent_turns:

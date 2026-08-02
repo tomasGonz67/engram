@@ -43,6 +43,40 @@ def compute_age_days(last_reinforced_at: datetime) -> float:
     return max(0.0, (now - last_reinforced_at).total_seconds() / 86400)
 
 
+def humanize_age(created_at: datetime) -> str:
+    """Converts elapsed time since created_at into a natural-language string
+    ("3 years ago", "2 days ago", "just now") for generate.py's prompt —
+    computed fresh on every request, so it's always accurate regardless of
+    how much real time has passed since the memory was stored, instead of a
+    relative-time phrase frozen into the memory's text at creation. Distinct
+    from compute_age_days: that returns a raw float for the ranking formula
+    and is driven by last_reinforced_at, not something meant for a language
+    model to read directly, and not the same field as this function uses.
+    created_at plays no role in ranking or decay — see database.py."""
+    age_days = compute_age_days(created_at)
+
+    if age_days < 1:
+        hours = round(age_days * 24)
+        if hours < 1:
+            return "just now"
+        return f"{hours} hour{'s' if hours != 1 else ''} ago"
+
+    if age_days < 7:
+        days = round(age_days)
+        return f"{days} day{'s' if days != 1 else ''} ago"
+
+    if age_days < 30:
+        weeks = round(age_days / 7)
+        return f"{weeks} week{'s' if weeks != 1 else ''} ago"
+
+    if age_days < 365:
+        months = round(age_days / 30)
+        return f"{months} month{'s' if months != 1 else ''} ago"
+
+    years = round(age_days / 365)
+    return f"{years} year{'s' if years != 1 else ''} ago"
+
+
 def compute_retrievability(stability: float, age_days: float) -> float:
     """(1 + age_days / stability)^-0.5. See architecture.md's Retrievability
     section. Not a half-life: at age_days == stability, retrievability is

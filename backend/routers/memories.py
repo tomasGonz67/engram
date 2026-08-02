@@ -1,4 +1,5 @@
 import uuid
+from datetime import datetime
 from fastapi import APIRouter
 from qdrant_client.models import PointStruct
 from models import MemoryInput, SearchInput
@@ -16,25 +17,36 @@ from formulas import (
 
 router = APIRouter()
 
-@router.post("/memories")
-def store(body: MemoryInput):
+def store_memory(text: str, impact: float, created_at: datetime = None, last_reinforced_at: datetime = None) -> dict:
+    """Embed and store a memory in both Qdrant and Postgres. Shared by the
+    /memories route below and by scripts/seed.py, which calls this directly
+    (in-process, no HTTP) instead of duplicating this logic — same reasoning
+    as search_memories() below: one implementation so it can't drift between
+    callers. created_at/last_reinforced_at are dev-only backdating hooks —
+    None (the default) preserves normal NOW() behavior; only seed.py ever
+    passes real values, never exposed through MemoryInput/the public route.
+    See dataModel.md and security-preventions.md."""
     id = str(uuid.uuid4())
-    vector = model.encode(body.text).tolist()
+    vector = model.encode(text).tolist()
 
     # Store vector in Qdrant
     qdrant.upsert(
         collection_name=COLLECTION_NAME,
-        points=[PointStruct(id=id, vector=vector, payload={"text": body.text})]
+        points=[PointStruct(id=id, vector=vector, payload={"text": text})]
     )
 
     # Business logic: clamp impact, compute initial stability
-    impact = clamp_impact(body.impact)
+    impact = clamp_impact(impact)
     stability = compute_initial_stability(impact)
 
     # Store metadata in Postgres
-    insert_memory(id, body.text, impact, stability)
+    insert_memory(id, text, impact, stability, created_at=created_at, last_reinforced_at=last_reinforced_at)
 
-    return {"id": id, "text": body.text}
+    return {"id": id, "text": text}
+
+@router.post("/memories")
+def store(body: MemoryInput):
+    return store_memory(body.text, body.impact)
 
 def search_memories(text: str, limit: int):
     """Embed text, retrieve and rank candidate memories. Returns a ranked
@@ -87,11 +99,14 @@ def search_memories(text: str, limit: int):
             # (retrievability/frequency, the computed values above, are what
             # actually feed it) — included purely so callers (e.g. an
             # analytics UI) can show the underlying numbers, not just the
-            # derived scores.
+            # derived scores. created_at specifically also feeds /generate's
+            # prompt (see generate.py) so the model can reason about
+            # accurate elapsed time — it plays no role in ranking either.
             "stability": meta["stability"],
             "use_count": meta["use_count"],
             "age_days": age_days,
             "impact": meta["impact"],
+            "created_at": meta["created_at"],
         })
 
     ranked.sort(key=lambda r: r["final_score"], reverse=True)
