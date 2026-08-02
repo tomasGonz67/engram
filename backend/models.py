@@ -4,6 +4,14 @@ from pydantic import BaseModel, Field
 class MemoryInput(BaseModel):
     text: str
     impact: float = 1.0
+    # Defaults to "young_adult" rather than the DB schema's "general", since
+    # a real (non-backdated) memory always gets created_at = NOW(), which
+    # falls in the young_adult range once scripts/backdate.sh's per-category
+    # ranges exist — a real memory can't retroactively be a childhood one.
+    # Free-form string, not constrained to a Literal like Turn.role — this
+    # field never reaches the LLM prompt, so there's no injection concern
+    # driving a fixed enum here, just a category label.
+    memory_type: str = "young_adult"
 
 class SearchInput(BaseModel):
     text: str

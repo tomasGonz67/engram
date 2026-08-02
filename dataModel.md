@@ -22,7 +22,7 @@ Every engram is split across two databases, connected by a UUID.
 | `use_count` | int | Number of times this memory was *meaningfully used* (included in an answer, explicitly selected, referenced later) — distinct from `retrieval_count` to avoid a self-reinforcing popularity loop where mere exposure strengthens a memory. Only this counter drives stability growth and the `frequency` term in ranking |
 | `created_at` | timestamptz | When the memory was first stored. Plays no role in ranking or decay (that's `last_reinforced_at`'s job) — its one use is feeding `/generate`'s prompt with an accurate, freshly-computed "time ago" marker via `formulas.humanize_age()`, see `architecture.md`'s "How Generation Works" |
 | `last_reinforced_at` | timestamptz | When the memory was last *meaningfully used* — not updated on every retrieval, only on reinforcement |
-| `memory_type` | string | Category of memory (episodic, semantic, procedural). Defaults to `general`. Classification logic not yet implemented — either user-provided or auto-classified via LLM in the future. |
+| `memory_type` | string | Free-form category label — user-provided via `MemoryInput.memory_type`, defaults to `"young_adult"` there (not the DB schema's own `DEFAULT 'general'`, which only applies to a bare INSERT bypassing the app — see `security-preventions.md`). Not a `Literal`/enum — any string is accepted, since this is a plain descriptive tag with no security or ranking implications, unlike e.g. `Turn.role`. Plays no role in ranking, decay, or the `/generate` prompt — currently write-only, not yet surfaced in any search/generate response. Actual current use: `scripts/seed.py` tags memories `childhood`/`teen`/`young_adult` so `scripts/backdate.sh` can backdate each to a different, life-stage-appropriate age range — see `scripts.md`. |
 
 ## How they connect
 
@@ -36,6 +36,7 @@ Qdrant handles semantic search — returns IDs of the most similar vectors. Post
 |-------|-------------|
 | `text` | Memory text to embed and store (required) |
 | `impact` | How significant this memory is, 0.5–2.0 (optional, defaults to 1.0). Clamped server-side regardless of what's sent. Seeds initial `stability` — see `architecture.md` |
+| `memory_type` | Free-form category label (optional, defaults to `"young_adult"`). Not clamped/validated like `impact` — any string is accepted, since it carries no ranking or security weight. Not echoed back in the store response |
 
 **Store response** `POST /memories`
 
