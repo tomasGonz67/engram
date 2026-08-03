@@ -17,6 +17,7 @@ services:
       POSTGRES_PASSWORD: engram_pass
       POSTGRES_DB: engram_db
       OPENAI_API_KEY: ${OPENAI_API_KEY}
+      ADMIN_BYPASS_TOKEN: ${ADMIN_BYPASS_TOKEN}
     depends_on:
       - qdrant
       - postgres

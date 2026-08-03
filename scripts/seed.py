@@ -25,6 +25,7 @@ then, regardless of category.
 """
 
 import json
+import os
 import random
 import sys
 import urllib.error
@@ -36,6 +37,32 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "backend"))
 from constants import MIN_IMPACT, MAX_IMPACT
 
 API_URL = "http://localhost:8000/memories"
+
+def _load_admin_bypass_token():
+    """ADMIN_BYPASS_TOKEN, sent as X-Admin-Bypass-Token on every request so
+    this script's ~100+ requests don't get rate-limited the same way a real
+    anonymous caller would be — see backend/rate_limit.py and
+    security-preventions.md. Not required: without it, seeding just runs
+    into the normal 20/5min limit like anyone else, same code path, just
+    slower.
+
+    An already-exported shell env var wins if present. Otherwise, since
+    this script runs on the host (not inside the backend container),
+    falls back to reading .env directly — docker-compose reads .env for
+    its own variable substitution into the container, it doesn't export
+    it to the host shell, so os.getenv() alone wouldn't see it here."""
+    token = os.getenv("ADMIN_BYPASS_TOKEN")
+    if token:
+        return token
+    env_path = Path(__file__).resolve().parent.parent / ".env"
+    if not env_path.exists():
+        return None
+    for line in env_path.read_text().splitlines():
+        if line.strip().startswith("ADMIN_BYPASS_TOKEN="):
+            return line.split("=", 1)[1].strip()
+    return None
+
+ADMIN_BYPASS_TOKEN = _load_admin_bypass_token()
 
 # Keyed by memory_type — see MemoryInput.memory_type and
 # scripts/backdate.sh, which backdates each category to a different,
@@ -295,10 +322,13 @@ def seed():
             i += 1
             impact = round(random.uniform(MIN_IMPACT, MAX_IMPACT), 2)
             payload = json.dumps({"text": text, "impact": impact, "memory_type": memory_type}).encode()
+            headers = {"Content-Type": "application/json"}
+            if ADMIN_BYPASS_TOKEN:
+                headers["X-Admin-Bypass-Token"] = ADMIN_BYPASS_TOKEN
             req = urllib.request.Request(
                 API_URL,
                 data=payload,
-                headers={"Content-Type": "application/json"},
+                headers=headers,
                 method="POST",
             )
             try:

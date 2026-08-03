@@ -94,6 +94,12 @@ DDoS protection (e.g. proxying through Cloudflare's free tier) is a separate, ad
 
 ---
 
+## ADMIN_BYPASS_TOKEN — required for prod
+
+Lets `scripts/seed.py` (and anything else run by the project owner directly) skip rate limiting by sending it as the `X-Admin-Bypass-Token` header — see `security-preventions.md`'s Resolved section for the full mechanism and why it doesn't weaken the no-auth decision on the actual product routes. Same secret-handling pattern as `OPENAI_API_KEY`: env var, gitignored `.env` locally, never hardcoded in a committed compose file. Whichever compose file/env config ends up defining the prod deployment needs its own value for this — without it, the bypass check can never pass (safe default), but that also means seeding against prod would run into the normal rate limit like any other caller until this is actually set.
+
+---
+
 ## ENVIRONMENT variable — required for prod
 
 `scripts/clear.sh` (see `DEVELOPMENT.md`) destroys all Postgres and Qdrant data and refuses to run if `ENVIRONMENT` resolves to `production` — but it reads that value out of the compose file it's pointed at, not a host shell variable. There is no production deployment yet, but whichever compose file (or equivalent config) ends up defining the production environment **must** set `ENVIRONMENT: production` on the backend service. Without it, this guard is a no-op and the reset script could be run against production data.
