@@ -1,11 +1,12 @@
 import json
 import openai
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Request
 from models import GenerateInput
 from database import openai_client, GENERATION_MODEL, normalize_id
 from routers.memories import search_memories
 from memory_operations import reinforce_memory
 from formulas import humanize_age
+from rate_limit import api_limit
 
 router = APIRouter()
 
@@ -54,7 +55,8 @@ REINFORCE_TOOL = {
 }
 
 @router.post("/generate")
-def generate(body: GenerateInput):
+@api_limit
+def generate(request: Request, body: GenerateInput):
     retrieved = search_memories(body.text, body.limit)
 
     memory_context = "\n".join(

@@ -42,6 +42,11 @@ Backend framework. Handles API routes, background jobs, and orchestrates communi
 #### psycopg2-binary
 PostgreSQL driver for Python. Used to connect to Postgres, create tables on startup, and execute queries.
 
+#### slowapi
+Rate limiting. IP-keyed (`get_remote_address`) since Masi Memory has no auth/session concept to key on instead — see `architecture.md`'s permanent no-auth decision. In-memory storage (slowapi's default), not Redis-backed — correct for the actual deployment shape (a single DigitalOcean droplet running one backend process, not multiple instances needing shared state — see `prod.md`).
+
+One shared limit — `20 requests per 5 minutes` + `200 per day` — pooled across `store`, `search`, and `generate` via `limiter.shared_limit(..., scope="global_api")` in `backend/rate_limit.py`, rather than each route getting its own independent allowance. See `security-preventions.md`'s Resolved section for the full reasoning, including two real gotchas found while building this: `default_limits` on the `Limiter` constructor does nothing without an explicit decorator on each route, and a per-route `@limiter.limit(...)` decorator (rather than `shared_limit`) gives each route its own separate bucket instead of one pooled total.
+
 #### torch (CPU-only)
 PyTorch is a dependency of sentence-transformers. Using the CPU-only build (`--extra-index-url https://download.pytorch.org/whl/cpu`) keeps the Docker image at ~2.4GB vs ~14.5GB for the full CUDA build. No GPU acceleration in dev — acceptable since inference runs fast enough on CPU for a single-user project. Switch to full PyTorch if deploying on a GPU instance.
 

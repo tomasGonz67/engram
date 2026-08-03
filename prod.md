@@ -17,7 +17,7 @@ The full production plan, settled after comparing cost/quality/performance trade
 
 With Postgres, Qdrant, and both AI models all external/managed, and the frontend hosted separately, the droplet itself only runs the backend process — no database, no vector store, no ML model resident in memory, no static files to serve either. That's what makes the cheapest viable droplet tier realistic instead of needing a 4GB+ instance just to hold an embedding model in RAM.
 
-**Still required before any of this goes live**: rate limiting on `store`, `search`, and `generate` — all three now carry real per-call cost once both API migrations happen (Postgres/Qdrant are flat-rate free tiers, not billed per-call, so they don't carry this same risk), and Masi Memory has no auth by design, so nothing else currently gates who can hit them. See "Embedding Model" and "Generation API" below.
+**Rate limiting on `store`, `search`, and `generate` is done** — all three now carry real per-call cost once both API migrations happen (Postgres/Qdrant are flat-rate free tiers, not billed per-call, so they don't carry this same risk), and Masi Memory has no auth by design, so nothing else currently gates who can hit them. Implemented with `slowapi`, one shared `20/5minutes;200/day` limit pooled across all three routes rather than per-route — see `security-preventions.md`'s Resolved section. See "Embedding Model" and "Generation API" below for what else this migration still needs.
 
 ---
 
@@ -54,7 +54,7 @@ Whichever compose file or deployment config ends up building this image for prod
 
 **Consequence**: vector dimensions change from 1024 (current) to 4096 (`Qwen3-Embedding-8B`). Vector dimensions are fixed at collection creation time in Qdrant — this requires creating a new collection and re-embedding every stored memory, not a config toggle. It also reduces how many vectors fit in Qdrant Cloud's free tier from roughly ~100k down to ~25k — still vastly more than this project needs, but worth knowing since it's a real, measurable tradeoff of the switch.
 
-**Prerequisite**: rate limiting on `store`/`search` before this migration ships — both become tied to an external API bill once this happens, and Masi Memory has no auth to gate them.
+**Prerequisite, done**: rate limiting on `store`/`search` — both become tied to an external API bill once this migration ships, and Masi Memory has no auth to gate them. See `security-preventions.md`'s Resolved section.
 
 ---
 
@@ -87,8 +87,8 @@ Requires an API key for access — unlike the current self-hosted Qdrant, which 
 The generation model (`gpt-5.4-nano`, see `techStack.md`) is an external paid API — every `/generate` call costs real money. Combined with the embedding model move above, **three routes** (`store`, `search`, `generate`) all carry real per-call cost once both API migrations are live, not just `/generate` alone — and by design (no auth, ever) all three are reachable by anyone who finds the URL.
 
 **Before any public deployment:**
-- Rate limiting on all three routes — highest priority, since an open API now translates directly into an open bill on more than one endpoint, not just generation.
-- A spend cap/budget alert on both the OpenAI account and whichever provider hosts the embedding API — not just an app-level rate limit, the same reasoning as spend alerts on any cloud account, since the app-level limit is the only thing standing between a traffic spike and an unbounded bill.
+- ~~Rate limiting on all three routes~~ — done, see `security-preventions.md`'s Resolved section.
+- A spend cap/budget alert on both the OpenAI account and whichever provider hosts the embedding API — not just an app-level rate limit, the same reasoning as spend alerts on any cloud account, since the app-level limit is the only thing standing between a traffic spike and an unbounded bill. Still not confirmed set.
 
 DDoS protection (e.g. proxying through Cloudflare's free tier) is a separate, additional layer worth adding eventually — rate limiting alone doesn't stop network-level flood attacks, since those can saturate the droplet's bandwidth before any application code even runs. Not yet decided on/built; noted here as a known gap, not solved by anything above.
 

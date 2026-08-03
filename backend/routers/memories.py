@@ -1,10 +1,11 @@
 import uuid
 from datetime import datetime
-from fastapi import APIRouter
+from fastapi import APIRouter, Request
 from qdrant_client.models import PointStruct
 from models import MemoryInput, SearchInput
 from database import model, qdrant, COLLECTION_NAME, insert_memory, get_memories_metadata, increment_retrieval_counts
 from constants import CANDIDATE_POOL_SIZE, SEMANTIC_THRESHOLD
+from rate_limit import api_limit
 from formulas import (
     clamp_impact,
     compute_initial_stability,
@@ -55,7 +56,8 @@ def store_memory(text: str, impact: float, memory_type: str = "young_adult", cre
     return {"id": id, "text": text}
 
 @router.post("/memories")
-def store(body: MemoryInput):
+@api_limit
+def store(request: Request, body: MemoryInput):
     return store_memory(body.text, body.impact, memory_type=body.memory_type)
 
 def search_memories(text: str, limit: int):
@@ -125,7 +127,8 @@ def search_memories(text: str, limit: int):
     return top
 
 @router.post("/memories/search")
-def search(body: SearchInput):
+@api_limit
+def search(request: Request, body: SearchInput):
     ranked = search_memories(body.text, body.limit)
     if not ranked:
         return {"message": "No valid memories found"}
