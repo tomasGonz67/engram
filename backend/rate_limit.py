@@ -2,9 +2,18 @@ import hmac
 import os
 import uuid
 from slowapi import Limiter
-from slowapi.util import get_remote_address
+from trusted_proxy import parse_trusted_proxies, resolve_client_ip
 
 ADMIN_BYPASS_TOKEN = os.getenv("ADMIN_BYPASS_TOKEN")
+
+# Comma-separated IPs/CIDRs of proxies allowed to hand us a client IP via
+# X-Forwarded-For — e.g. Traefik's fixed address on its private Docker
+# network (see prod.md's "Reverse proxy & trusted client IP" section).
+# Empty/unset (the default) trusts nobody, identical to today's behavior.
+# Parsed at import time specifically so a malformed value fails
+# application startup immediately rather than silently narrowing or
+# widening the trust boundary — see trusted_proxy.parse_trusted_proxies.
+TRUSTED_PROXY_IPS = parse_trusted_proxies(os.getenv("TRUSTED_PROXY_IPS", ""))
 
 def get_rate_limit_key(request) -> str:
     """Returns the IP to key rate limiting by, unless a valid admin bypass
@@ -27,11 +36,22 @@ def get_rate_limit_key(request) -> str:
     caller can't guess the token character-by-character via response-time
     differences. Defaults the header to "" (not None) first specifically
     so compare_digest never sees a missing header as None, which it can't
-    compare against a str without raising."""
+    compare against a str without raising.
+
+    Client IP resolution goes through trusted_proxy.resolve_client_ip()
+    rather than slowapi's own get_remote_address() (which only ever reads
+    request.client.host) — see trusted_proxy.py for why, and prod.md for
+    the deployment side (backend port never publicly reachable, Uvicorn
+    started with --no-proxy-headers so it never rewrites request.client
+    itself) that this depends on to be meaningful rather than just
+    decorative. Uvicorn's own proxy-header handling must stay off:
+    trusted_proxy.py is the sole owner of this decision, not a second
+    layer alongside it — see trusted_proxy.py's module docstring."""
     token = request.headers.get("X-Admin-Bypass-Token", "")
     if ADMIN_BYPASS_TOKEN and hmac.compare_digest(token, ADMIN_BYPASS_TOKEN):
         return str(uuid.uuid4())
-    return get_remote_address(request)
+    peer_host = request.client.host if request.client else None
+    return resolve_client_ip(peer_host, request.headers.get("X-Forwarded-For"), TRUSTED_PROXY_IPS)
 
 # Single shared Limiter instance, imported by both routers/ files and by
 # main.py for setup. IP-keyed (via get_rate_limit_key above) since Masi

@@ -1,0 +1,147 @@
+{
+  "positive_cases": [
+    {"query": "do I have a girlfriend?", "relevant_memory_texts": [
+      "Met my girlfriend Madeline playing Toontown"
+    ]},
+    {"query": "tell me about the surgery", "relevant_memory_texts": [
+      "Madeline was incredibly supportive while I dealt with surgery",
+      "Madeline stayed by my side through the whole surgery ordeal",
+      "Had to apply for financial aid to cover the surgery bill",
+      "Got hit with a $60,000 medical bill after the surgery",
+      "Didn't have insurance when I needed surgery in Chicago",
+      "Had to get surgery while in Chicago"
+    ]},
+    {"query": "what happened in Chicago?", "relevant_memory_texts": [
+      "Visited Madeline in Chicago",
+      "Flew out to Chicago to see Madeline",
+      "Didn't have insurance when I needed surgery in Chicago",
+      "Had to get surgery while in Chicago"
+    ]},
+    {"query": "did I ever get a raise at work?", "relevant_memory_texts": [
+      "Got a raise at work"
+    ]},
+    {"query": "tell me about Eleutheria", "relevant_memory_texts": [
+      "Built an anonymous chat platform called Eleutheria as a side project",
+      "Built random one-on-one chat matching for my project Eleutheria"
+    ]},
+    {"query": "tell me about my AI memory project", "relevant_memory_texts": [
+      "Built a biologically inspired AI memory system as a personal project",
+      "Designed the decay and reinforcement formulas for my AI memory system"
+    ]},
+    {"query": "what work have I done for Cadooga?", "relevant_memory_texts": [
+      "Started working as a senior engineer at Cadooga",
+      "Worked on Cadooga's backend API gateway",
+      "Built the image crawler for Cadooga using face detection",
+      "Worked on the React Native mobile app for Cadooga",
+      "Built the admin frontend for Cadooga"
+    ]},
+    {"query": "tell me about my dog William", "relevant_memory_texts": [
+      "My chihuahua William hated pretty much everyone except my mom",
+      "William the chihuahua would growl at guests but loved my mom",
+      "William only ever wanted to be around my mom, not the rest of us",
+      "Our two dogs April Porkchop and William had completely opposite personalities",
+      "William passed away from old age",
+      "Lost both William and April Porkchop to old age"
+    ]},
+    {"query": "how did Bailey die?", "relevant_memory_texts": [
+      "Bailey passed away and the whole family was devastated",
+      "Lio seemed to grieve after Bailey passed away",
+      "Brought home a new dog named Bugzy after Bailey passed"
+    ]},
+    {"query": "was I ever stressed about money?", "relevant_memory_texts": [
+      "Lay awake at night stressed about money",
+      "Stressed for months about how to pay off a $60,000 medical bill",
+      "Forgot to pay a bill and got hit with a late fee",
+      "Had to apply for financial aid to cover the surgery bill"
+    ]},
+    {"query": "tell me about weightlifting", "relevant_memory_texts": [
+      "Traded running for weightlifting and crossfit",
+      "Transitioned from cross country to weightlifting and crossfit",
+      "Clean and jerked 235 pounds",
+      "Snatched 180 pounds",
+      "Back squatted 340 pounds",
+      "Front squatted 312 pounds",
+      "Competed in a crossfit competition alongside my dad",
+      "Did a crossfit competition with my dad"
+    ]},
+    {"query": "what degree did I get?", "relevant_memory_texts": [
+      "Walked at graduation with a degree in IT and a computer science minor",
+      "Graduated college with a major in IT and a minor in computer science"
+    ]},
+    {"query": "tell me about cross country", "relevant_memory_texts": [
+      "Was the worst runner on the team at my first cross country practice",
+      "Finished dead last at my very first cross country practice",
+      "Struggled to keep up with everyone during my first cross country practice",
+      "Became the fastest freshman on the cross country team by the end of the season",
+      "Surprised everyone by becoming the top freshman on the cross country team",
+      "Finished my sophomore year ranked top 5 on the cross country team",
+      "Led the cross country team as the top runner senior year",
+      "Was the best runner on the cross country team my senior year",
+      "Worked my way up to being the best freshman runner on the team",
+      "Went to Nakayama with the cross country team after a meet"
+    ]},
+    {"query": "what running times have I had?", "relevant_memory_texts": [
+      "Ran a 4:29 mile in high school",
+      "Ran a 9:53 two mile in high school",
+      "Ran a 16:21 5K in high school",
+      "Ran a 26:36 8K in college"
+    ]},
+    {"query": "tell me about college", "relevant_memory_texts": [
+      "Started college at NJIT",
+      "Started taking computer science classes at NJIT",
+      "Took a really hard class in college",
+      "Took a hard calc exam in college",
+      "Chloe died while I was away at college"
+    ]},
+    {"query": "tell me about my dog Chloe", "relevant_memory_texts": [
+      "Brought home a boxer puppy named Chloe",
+      "We got a new dog named Chloe",
+      "Bailey's best friend was our boxer Chloe",
+      "Bailey and Chloe were inseparable best friends",
+      "Watched Bailey and Chloe eat side by side all the time",
+      "Bailey was always licking Chloe",
+      "Bailey and Chloe would eat their food together",
+      "Chloe died while I was away at college"
+    ]},
+    {"query": "tell me about trick or treating", "relevant_memory_texts": [
+      "Dressed up in a costume for Halloween and went trick-or-treating",
+      "Went trick-or-treating around the neighborhood on Halloween",
+      "Traded candy with friends after trick-or-treating"
+    ]},
+    {"query": "tell me about playing Toontown", "relevant_memory_texts": [
+      "Played Toontown for hours after school",
+      "Logged into Toontown with friends from school",
+      "Battled cogs in Toontown with friends after school",
+      "Met my girlfriend Madeline playing Toontown",
+      "Started talking to Madeline after meeting her on Toontown"
+    ]},
+    {"query": "tell me about my brother Ed", "relevant_memory_texts": [
+      "Hung out with my brother Ed playing video games after school in Beau Ridge",
+      "Played video games with my brother Ed in Beau Ridge",
+      "Went swimming in the pool with my brother Ed"
+    ]},
+    {"query": "did I win any Hearthstone tournaments?", "relevant_memory_texts": [
+      "Placed well in a Hearthstone tournament and won some money",
+      "Won money from a Hearthstone tournament"
+    ]},
+    {"query": "tell me about my dad Wilson", "relevant_memory_texts": [
+      "Waited for my dad Wilson to finish paying bills so he'd play Crash Bandicoot with me",
+      "Begged my dad Wilson to play video games with me even though he had bills to pay",
+      "My dad Wilson finally gave in and played Crash Bandicoot with me for a bit",
+      "Played Crash Bandicoot with my dad Wilson"
+    ]},
+    {"query": "tell me about jet skiing", "relevant_memory_texts": [
+      "Went jet skiing with Madeline, my brother, and my dad",
+      "Spent a day jet skiing with Madeline and my family"
+    ]},
+    {"query": "did I ever bomb a job interview?", "relevant_memory_texts": [
+      "Bombed a job interview"
+    ]}
+  ],
+  "negative_cases": [
+    {"query": "asdkjf qwoeiru zzxcvbn blorp glorp nonsense gibberish"},
+    {"query": "what is the capital of France?"},
+    {"query": "how do I fix a flat tire on my car?"},
+    {"query": "what's the best recipe for chocolate chip cookies?"}
+  ]
+}

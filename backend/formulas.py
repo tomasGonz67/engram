@@ -1,16 +1,14 @@
 import math
+import re
 from datetime import datetime, timezone
 
 from constants import (
     BASE_STABILITY,
-    REINFORCEMENT_MULTIPLIER,
-    MAX_STABILITY,
     MIN_IMPACT,
     MAX_IMPACT,
     SEMANTIC_WEIGHT,
     RETRIEVABILITY_WEIGHT,
     FREQUENCY_WEIGHT,
-    MIN_RETRIEVABILITY,
 )
 
 
@@ -25,13 +23,6 @@ def compute_initial_stability(impact: float) -> float:
     Clamps impact itself rather than trusting the caller already did — this
     function should never be able to produce an invalid stability."""
     return BASE_STABILITY * clamp_impact(impact)
-
-
-def compute_reinforced_stability(stability: float) -> float:
-    """min(stability * REINFORCEMENT_MULTIPLIER, MAX_STABILITY). See
-    architecture.md's "On meaningful use" section — only called on confirmed
-    use, never on a memory merely being returned by search."""
-    return min(stability * REINFORCEMENT_MULTIPLIER, MAX_STABILITY)
 
 
 def compute_age_days(last_reinforced_at: datetime) -> float:
@@ -93,8 +84,9 @@ def compute_retrievability(stability: float, age_days: float) -> float:
 
 def compute_frequency(use_count: int) -> float:
     """1 - exp(-use_count / 5). See architecture.md's "How Retrieval Works"
-    section. use_count only reflects confirmed meaningful use, not every
-    time a memory is returned by search."""
+    section. use_count only reflects estimated meaningful use (see
+    reinforce_memory()'s docstring for what "estimated" means here), not
+    every time a memory is returned by search."""
     return 1 - math.exp(-use_count / 5)
 
 
@@ -106,13 +98,41 @@ def normalize_qdrant_similarity(raw_similarity: float) -> float:
     return (raw_similarity + 1) / 2
 
 
-def compute_consolidation_threshold(impact: float) -> float:
-    """MIN_RETRIEVABILITY / impact — how low retrievability must drop before
-    a memory is prune-eligible. Scales with impact so high-impact memories
-    need to decay further before deletion, modeling flashbulb-memory-style
-    enhanced durability rather than pruning purely on time and reinforcement
-    alone. See architecture.md's Consolidation section."""
-    return MIN_RETRIEVABILITY / impact
+def compute_cosine_similarity(vector_a: list[float], vector_b: list[float]) -> float:
+    """Plain-Python cosine similarity between two embedding vectors, in
+    [-1, 1] — pass through normalize_qdrant_similarity for the same [0, 1]
+    scale Qdrant's own scores use. Used by /generate's reinforcement
+    guardrail to compare a candidate memory's vector against an embedding of
+    the model's actual final answer, entirely locally (no OpenAI call,
+    same embedding model already used for storage/retrieval) — see
+    architecture.md's "How Generation Works"."""
+    dot = sum(a * b for a, b in zip(vector_a, vector_b))
+    norm_a = math.sqrt(sum(a * a for a in vector_a))
+    norm_b = math.sqrt(sum(b * b for b in vector_b))
+    return dot / (norm_a * norm_b)
+
+
+def split_into_sentences(text: str) -> list[str]:
+    """Splits on blank lines/bullets first, then sentence-ending punctuation
+    within each. Used by /generate's reinforcement guardrail so a long,
+    multi-topic answer gets compared sentence-by-sentence against each
+    proposed memory instead of as one embedded block — a long answer's
+    generic wrapper text (greetings, transition phrases, closing questions)
+    was measured to dilute the whole-answer embedding enough to drag a
+    genuinely-cited memory's similarity score below threshold, even though
+    one specific sentence in it was a near-exact paraphrase. See
+    security-preventions.md's Resolved section. Not linguistically precise
+    (doesn't handle abbreviations, decimals, etc.) — fine here since the
+    output only ever feeds a similarity comparison, not anything requiring
+    grammatical correctness."""
+    lines = re.split(r"\n+", text)
+    sentences = []
+    for line in lines:
+        line = line.strip()
+        if not line:
+            continue
+        sentences.extend(s.strip() for s in re.split(r"(?<=[.!?])\s+", line) if s.strip())
+    return sentences
 
 
 def compute_final_score(semantic: float, retrievability: float, frequency: float) -> float:

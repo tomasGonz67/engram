@@ -20,8 +20,8 @@ Relational database. Stores all engram metadata — `impact`, `stability`, `retr
 
 **Why Postgres:**
 - Schema is fixed — every engram has the same fields, no flexibility needed
-- Consolidation (pruning weak memories) reads `stability`/`last_reinforced_at`/`impact` for every row and issues one batched `DELETE ... WHERE id = ANY(...)` for whatever's prune-eligible — the threshold math itself runs in Python (`memory_operations.consolidate()`), not SQL, but the bulk read/delete pattern is still a natural fit for a relational store, not a document store
-- ACID compliance — transaction guarantees when Consolidation updates many records at once
+- Decay-Based Forgetting reads `id`/`stability`/`last_reinforced_at`, computes eligibility in Python (`memory_operations.delete_decayed_memories()`), and deletes eligible Postgres rows in one transactional batch (`DELETE ... WHERE id = ANY(...)`) — the bulk read/delete pattern is still a natural fit for a relational store, not a document store
+- ACID compliance — the Postgres batch delete itself is transactional, but the Qdrant deletion that follows is a separate operation; the complete dual-store deletion is not atomic (see `techDebt.md`'s "Non-atomic dual-store writes/deletes" entry)
 - Better for relational data — if users are added later, foreign keys handle it cleanly
 
 **Why both Qdrant and Postgres:**
@@ -62,28 +62,29 @@ Loads and runs embedding models locally. Acts as the encoding layer — converts
 
 **Loaded once on startup and kept in memory.** The model is stateless during inference — weights do not change between requests. Since embedding is a core dependency in store and retrieve operations, the model is typically loaded once and kept resident in memory. This avoids model reload overhead, so each request only incurs inference compute cost plus standard system overhead such as tokenization, request scheduling, and I/O. This is standard practice for embedding services in production systems regardless of model size.
 
+**Query instruction prefix**: Qwen3-Embedding is instruction-aware — its model card recommends prefixing *queries* (not documents) with a task instruction for retrieval, typically worth 1-5%. `search_memories()` (`routers/memories.py`) prepends `RETRIEVAL_QUERY_INSTRUCTION` (`constants.py`) to the query text before embedding; stored memory text stays bare, matching the model's own config (an empty prompt for "document," a real one for "query"). Applied via plain string concatenation rather than `sentence-transformers`' `prompt_name="query"` shortcut, deliberately — manual concatenation keeps query construction portable across the local and planned API paths without relying on `sentence-transformers`-specific prompt plumbing. That portability is about how the query text gets built, not a claim that retrieval behavior itself is identical across the two paths — prod swaps in a different model entirely (`Qwen3-Embedding-8B`, 4096 dimensions, via a remote provider) rather than just a different code path to the same 0.6B model, and provider-side tokenization/normalization/truncation could plausibly differ too. Empirically tested before adopting, not just applied on the model card's say-so — see `architecture.md`'s "How Retrieval Works" for the actual measured numbers (Recall@5, MRR, negative-query separation) and `security-preventions.md`'s Resolved section for the full experiment — but that testing was against the dev `Qwen3-Embedding-0.6B` model only. Retrieval behavior still needs to be re-evaluated against the production 8B provider before assuming the same results carry over.
+
 ---
 
 ## OpenAI API (Generation)
-External LLM API. Handles the "AG" (generation) half of RAG — takes the query, whatever `search()` retrieves, and a small window of recent conversation turns, and produces the actual answer. Also the tool-calling boundary: exposes `reinforce_memory` as a callable tool so the model can mark a memory as meaningfully used, per `architecture.md`'s "On meaningful use" distinction.
+External LLM API. Handles the "AG" (generation) half of RAG — takes the query, whatever `search()` retrieves, and a small window of recent conversation turns, and produces the actual answer. No function calling is involved — `/generate` sends one plain completion request; a code-level guardrail decides reinforcement afterward, entirely outside the model (see `architecture.md`'s "How Generation Works").
 
 **Model:** `gpt-5.4-nano`
 
 **Why GPT-5.4 Nano:**
 - Cheapest of the models evaluated — $0.20 / $1.25 per M tokens (input/output), vs GPT-5 mini's $0.25 / $2.00 and GPT-5.4 Mini's $0.75 / $4.50
-- Tool-calling reliability matches or beats the pricier GPT-5.4 Mini tier (57.7% vs 56.1% on MCP Atlas) — the only capability that actually matters here, since `reinforce_memory` is the sole tool exposed
-- GPT-5.4 Mini's edge over Nano is computer-use and tool search, neither relevant to a single-tool workflow
 - Current generation (released March 2026) — unlike Gemini 2.5 Flash Lite, which was ruled out for being scheduled for shutdown October 16, 2026
+- Tool-calling reliability was originally part of this decision (Nano matched or beat the pricier GPT-5.4 Mini tier on MCP Atlas at the time) — no longer a live factor, since `/generate` stopped using function calling entirely (see `architecture.md`'s "Why there's no function calling"). The cost and currency reasons above still stand on their own regardless; nothing here forces revisiting the model choice, but if it were being made fresh today, tool-calling benchmarks wouldn't be part of the comparison.
 
 **Why an API instead of self-hosting:**
 - Usable generation quality needs GPU compute; DigitalOcean GPU droplets run ~$2.50–$6.74/hr even sitting idle, versus pay-per-token pricing — at this project's low, sporadic query volume, self-hosting would cost far more than it saves
 - Unlike the embedding model (small, called on every store *and* search, cheap enough for CPU), generation runs far less often and needs a much bigger model to produce good output — the "already-paid-for idle CPU" argument that justifies self-hosting embeddings doesn't hold here
 
-**Alternatives considered:**
+**Alternatives considered** (at the time of the original decision, when tool-calling capability was still a factor):
 - Claude Haiku 4.5 — priciest candidate on both input and output, no offsetting reliability edge for this use case
 - Llama 3.3 70B / Llama-3-Groq-70B-Tool-Use (Groq) — legitimate contender, strong published BFCL tool-calling score and cheap output pricing, but Nano beat it on cost without giving anything up
 - Gemini 2.5 Flash Lite — cheapest raw pricing, but ruled out over the Oct 2026 shutdown
-- GPT-5 mini (previous OpenAI generation) — superseded by GPT-5.4 Nano on both cost and tool-calling
+- GPT-5 mini (previous OpenAI generation) — superseded by GPT-5.4 Nano on cost regardless of tool-calling
 
 **Statelessness:** like every LLM chat API, each call is independent — nothing is retained between requests. Masi Memory reconstructs the relevant context (system prompt + retrieved memories + a small bounded window of recent turns) and resends it in full on every generation call. This is exactly why the Qdrant/Postgres layer exists as a separate system — the LLM itself has no persistent memory to lean on.
 
@@ -102,7 +103,7 @@ Single-page chat interface in `frontend/`. Calls `/generate` directly — no ser
 
 **Sliding window for `recent_turns`**: the frontend caps what it sends to `/generate` at the last 20 messages (`RECENT_TURNS_LIMIT` in `App.tsx`), not the full conversation history. Not primarily a cost decision — at this project's usage scale a full 20-message conversation costs about $0.0015, negligible either way. The real reasons: avoiding "lost in the middle" quality degradation on unusually long conversations, and staying nowhere near GPT-5.4 Nano's 400K token context ceiling. 20 was chosen because it roughly matches typical conversation length, so it rarely triggers for normal use — it's a ceiling for the runaway case, not a constraint on typical usage.
 
-**Analytics panel**: alongside the chat, each message gets its own card showing that query's real retrieval/generation data — every retrieved memory's `semantic`/`retrievability`/`frequency`/`final_score` plus the raw `stability`/`use_count`/`age_days`/`impact` values behind them, and a "reinforced" tag on whichever ones the model actually cited (cross-referencing `reinforced_memory_ids` against `retrieved`). This is the actual reason those raw fields were added to `search_memories()`'s response (see `dataModel.md`) — no new endpoints needed, `/generate` already returned everything required. Observed in practice that the model's tool-calling isn't perfectly consistent — the same or similar query can reinforce 0, 1, or all 5 retrieved memories across different runs, a real, visible instance of the tool-calling reliability tradeoff already documented under "Why GPT-5.4 Nano" above.
+**Analytics panel**: alongside the chat, each message gets its own card showing that query's real retrieval/generation data — every retrieved memory's `semantic`/`retrievability`/`frequency`/`final_score` plus the raw `stability`/`use_count`/`age_days`/`impact` values behind them, and a "reinforced" tag on whichever ones the reinforcement guardrail estimated were reflected in the answer (cross-referencing `reinforced_memory_ids` against `retrieved`). This is the actual reason those raw fields were added to `search_memories()`'s response (see `dataModel.md`) — no new endpoints needed, `/generate` already returned everything required. The same or similar query can still reinforce anywhere from 0 to all 5 retrieved memories across different runs — not because of tool-calling variance anymore (there's no tool calling), but because the model's answer wording genuinely varies between runs, and the guardrail checks that actual wording each time.
 
 **Header info buttons** (About / Formulas / Neuroscience): static reference content — what Masi Memory is, the actual ranking/decay/reinforcement formulas, and plain-English explanations of each stat grounded in the same reasoning already documented in `architecture.md` (the testing effect, flashbulb memories, etc.). No backend calls, just hardcoded content mirrored from the docs.
 

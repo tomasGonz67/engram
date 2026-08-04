@@ -10,11 +10,6 @@ const API_URL = import.meta.env.VITE_API_URL ?? "http://localhost:8000";
 // GPT-5.4 Nano's 400K token context ceiling.
 const RECENT_TURNS_LIMIT = 20;
 
-// Mirrors backend/constants.py's SEMANTIC_THRESHOLD — not returned by the
-// API (it's a fixed config value, not per-request data), so hardcoded here
-// purely for display in the analytics modal.
-const SEMANTIC_THRESHOLD = 0.75;
-
 type Turn = {
   role: "user" | "assistant";
   content: string;
@@ -31,6 +26,7 @@ type RetrievedMemory = {
   use_count: number;
   age_days: number;
   impact: number;
+  created_at: string;
 };
 
 type AnalyticsEntry = {
@@ -46,10 +42,24 @@ function safeToFixed(value: unknown, decimals: number): string {
   return typeof value === "number" ? value.toFixed(decimals) : "?";
 }
 
+// created_at comes from the backend as an ISO timestamp string; formatted
+// here rather than reimplementing formulas.py's humanize_age() bucketing
+// logic client-side, so there's nothing to keep in sync with the backend.
+function formatCreatedAt(value: unknown): string {
+  if (typeof value !== "string") return "?";
+  const date = new Date(value);
+  if (isNaN(date.getTime())) return "?";
+  return date.toLocaleDateString(undefined, {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+  });
+}
+
 const ABOUT_TEXT =
   "Masi Memory is a biologically inspired memory system for AI — a simplified " +
   "model of human memory that incorporates real cognitive science " +
-  "principles (decay, reinforcement, consolidation) into practical " +
+  "principles (decay, reinforcement, forgetting) into practical " +
   "algorithms for long-term AI memory, instead of just storing and " +
   "replaying text verbatim.";
 
@@ -58,10 +68,10 @@ const FORMULAS = [
   { name: "Initial stability (at creation)", formula: "stability = BASE_STABILITY × impact" },
   { name: "Semantic similarity", formula: "semantic = (raw_cosine_similarity + 1) / 2" },
   { name: "Age", formula: "age_days = days since last_reinforced_at" },
-  { name: "Retrievability (computed live, never stored)", formula: "retrievability = (1 + age_days / stability) ^ -0.5" },
-  { name: "Use count", formula: "use_count += 1 (on each confirmed reinforcement)" },
+  { name: "Retrievability (computed live, never stored — governs forgetting, not ranking)", formula: "retrievability = (1 + age_days / stability) ^ -0.5" },
+  { name: "Use count", formula: "use_count += 1 (on each reinforcement)" },
   { name: "Frequency", formula: "frequency = 1 - exp(-use_count / 5)" },
-  { name: "Ranking score", formula: "final_score = 0.75×semantic + 0.15×retrievability + 0.10×frequency" },
+  { name: "Ranking score", formula: "final_score = 0.95×semantic + 0.05×frequency" },
   { name: "On reinforcement", formula: "stability = min(stability × 1.2, MAX_STABILITY)" },
 ];
 
@@ -72,7 +82,7 @@ const NEUROSCIENCE_TERMS = [
   },
   {
     term: "stability",
-    explanation: "How resistant this memory is to being forgotten. Starts based on how significant it seemed when created, and grows every time it's genuinely relied on — like a synapse strengthening from real use, not just being glanced at.",
+    explanation: "How resistant this memory is to being forgotten. Starts based on how significant it seemed when created, and grows every time it's estimated to have been relied on — like a synapse strengthening from real use, not just being glanced at.",
   },
   {
     term: "semantic",
@@ -88,19 +98,19 @@ const NEUROSCIENCE_TERMS = [
   },
   {
     term: "use_count",
-    explanation: "How many times this memory was actually relied on to answer something, not just shown as a candidate. Grounded in the \"testing effect\": genuinely using information strengthens it far more than passively re-reading it.",
+    explanation: "How many times this memory's text was estimated, via embedding similarity to the answer, to have been reflected in an answer — not just shown as a candidate. That's an estimate with a measured false-positive rate for short text, not a certain determination. Loosely inspired by the \"testing effect\": a human actively retrieving information and an LLM being handed a memory pre-loaded in its prompt aren't really the same process, so treat this as an engineering analogy, not a claim that this mechanism works the same way.",
   },
   {
     term: "frequency",
-    explanation: "A score derived from use_count that feeds into ranking — how often this memory has proven genuinely useful.",
+    explanation: "A score derived from use_count that feeds into ranking — how often this memory has been estimated as genuinely useful.",
   },
   {
     term: "final_score",
-    explanation: "The combined ranking score memories are actually sorted by — mostly semantic similarity (75%), with smaller contributions from retrievability (15%) and frequency (10%). A weighted sum rather than a product, deliberately, so one weak signal (like a brand-new, never-used memory) can't zero out an otherwise strong match.",
+    explanation: "The combined ranking score memories are actually sorted by — mostly semantic similarity (95%), with a small contribution from frequency (5%). Retrievability isn't part of this score — it governs when a memory eventually gets forgotten (deleted), not how memories are ranked, after testing showed giving it ranking weight actively hurt relevance. A weighted sum rather than a product, deliberately, so one weak signal (like a brand-new, never-used memory) can't zero out an otherwise strong match.",
   },
   {
     term: "reinforcement",
-    explanation: "What happens when a memory is confirmed to have actually been used, not just shown. Each reinforcement multiplies stability by 1.2× (capped at a maximum), making the memory meaningfully harder to forget going forward. Deliberately never triggered by mere retrieval — only by confirmed use — because reinforcing on exposure alone would create a self-reinforcing loop where popular memories rank higher, get shown more, get reinforced just from being seen, and rank even higher still, regardless of whether they were ever actually useful.",
+    explanation: "What happens when a memory's text is estimated, via embedding similarity, to have been used — not just shown. That estimate has a measured false-positive rate for short text, so this isn't a perfect detector, but it's a deliberately independent, deterministic check rather than trusting the model to self-report what it used. Each reinforcement multiplies stability by 1.2× (capped at a maximum), making the memory meaningfully harder to forget going forward. Deliberately never triggered by mere retrieval — only by this estimated use — because reinforcing on exposure alone would create a self-reinforcing loop where popular memories rank higher, get shown more, get reinforced just from being seen, and rank even higher still, regardless of whether they were ever actually useful.",
   },
 ];
 
@@ -233,15 +243,13 @@ function App() {
               </button>
             </div>
             <div className="modal-body">
-              <p className="threshold-note">
-                Semantic threshold: {SEMANTIC_THRESHOLD}
-              </p>
               {openEntry.retrieved.length === 0 && (
                 <p>No memories retrieved for this message.</p>
               )}
               {openEntry.retrieved.map((m) => (
                 <div className="memory-row" key={m.id}>
                   <p className="memory-text">"{m.text}"</p>
+                  <p className="memory-age">stored {formatCreatedAt(m.created_at)}</p>
                   <div className="memory-scores">
                     <span>stability: {safeToFixed(m.stability, 2)}</span>
                     <span>use_count: {typeof m.use_count === "number" ? m.use_count : "?"}</span>

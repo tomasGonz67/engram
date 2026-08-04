@@ -1,8 +1,10 @@
 #!/bin/bash
-# Resets Postgres and Qdrant together so they can never drift out of sync with
-# each other (e.g. a memory existing as a vector in Qdrant with no matching
-# metadata row in Postgres, or vice versa). Does NOT touch the hf_cache volume
-# — no reason to force a re-download of the embedding model.
+# Resets Postgres and Qdrant together to keep them synchronized during a
+# successful complete run (e.g. avoiding a memory existing as a vector in
+# Qdrant with no matching metadata row in Postgres, or vice versa) — not a
+# guarantee against drift if the run itself fails partway through. Does NOT
+# touch the hf_cache volume — no reason to force a re-download of the
+# embedding model.
 #
 # Destructive — dev only. Refuses to run if the ENVIRONMENT value baked into
 # docker-compose-dev.yml resolves to 'production'. The compose file is the

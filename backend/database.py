@@ -110,26 +110,33 @@ def get_memories_metadata(ids: list[str]) -> dict:
     }
 
 def get_all_memories():
-    """Fetch id, stability, last_reinforced_at, impact for every stored
-    memory. Used by Consolidation to compute retrievability and decide what
-    to prune. Plain read, no business logic."""
+    """Fetch id, stability, last_reinforced_at for every stored memory.
+    Used by Decay-Based Forgetting to compute retrievability and decide
+    what to delete. Plain read, no business logic.
+
+    Deliberately does not select impact: the flat MIN_RETRIEVABILITY
+    threshold no longer depends on it (see constants.py) — see
+    delete_decayed_memories(), which never reads it."""
     conn = get_pg_conn()
     try:
         with conn:
             with conn.cursor() as cur:
-                cur.execute("SELECT id, stability, last_reinforced_at, impact FROM memories")
+                cur.execute("SELECT id, stability, last_reinforced_at FROM memories")
                 rows = cur.fetchall()
     finally:
         conn.close()
     return [
-        {"id": str(row[0]), "stability": row[1], "last_reinforced_at": row[2], "impact": row[3]}
+        {"id": str(row[0]), "stability": row[1], "last_reinforced_at": row[2]}
         for row in rows
     ]
 
 def delete_memories(ids: list[str]):
-    """Delete memories from both Postgres and Qdrant together, so they can
-    never drift out of sync with each other — same reasoning as
-    scripts/clear.sh. Plain write, no business logic."""
+    """Delete memories from both Postgres and Qdrant, reducing the risk of
+    drift between them — same reasoning as scripts/clear.sh. Not atomic:
+    these are two sequential operations, so a failure between them can
+    still leave an orphan in whichever store didn't get the second call —
+    see techDebt.md's "Non-atomic dual-store writes/deletes" entry. Plain
+    write, no business logic."""
     ids = [normalize_id(id) for id in ids]
     if not ids:
         return
@@ -160,21 +167,30 @@ def increment_retrieval_counts(ids: list[str]):
     finally:
         conn.close()
 
-def update_memory_reinforcement(id: str, stability: float):
-    """Apply reinforcement: write the new (already-computed) stability,
-    increment use_count by 1, refresh last_reinforced_at to now. Plain write
-    — no business logic; the caller already computed the new stability via
-    compute_reinforced_stability. use_count increments in SQL itself
-    (use_count + 1) rather than being passed in, so two concurrent
-    reinforcements can't clobber each other's increment."""
+def update_memory_reinforcement(id: str, multiplier: float, max_stability: float) -> bool:
+    """Apply reinforcement atomically in one UPDATE: stability = min(current
+    stability * multiplier, max_stability), use_count + 1, last_reinforced_at
+    = NOW(). Deliberately NOT a read-then-compute-then-write — an earlier
+    version read stability in Python, multiplied it there, and wrote the
+    result back, which let two concurrent reinforcements both read the same
+    starting stability and each write stability * multiplier once, silently
+    losing one increment's worth of growth (use_count was already safe,
+    since `use_count + 1` runs in SQL). Postgres serializes concurrent
+    UPDATEs against the same row, so computing LEAST(stability * %s, %s)
+    inside the UPDATE itself always operates on whatever stability is
+    truly current at that moment, not a value read earlier in a separate
+    round-trip. See security-preventions.md's Resolved section. Returns
+    False if no row matched id, so the caller can raise a clear error
+    without needing its own separate existence check beforehand."""
     id = normalize_id(id)
     conn = get_pg_conn()
     try:
         with conn:
             with conn.cursor() as cur:
                 cur.execute(
-                    "UPDATE memories SET stability = %s, use_count = use_count + 1, last_reinforced_at = NOW() WHERE id = %s::uuid",
-                    (stability, id)
+                    "UPDATE memories SET stability = LEAST(stability * %s, %s), use_count = use_count + 1, last_reinforced_at = NOW() WHERE id = %s::uuid",
+                    (multiplier, max_stability, id)
                 )
+                return cur.rowcount > 0
     finally:
         conn.close()

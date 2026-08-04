@@ -4,7 +4,7 @@ from fastapi import APIRouter, Request
 from qdrant_client.models import PointStruct
 from models import MemoryInput, SearchInput
 from database import model, qdrant, COLLECTION_NAME, insert_memory, get_memories_metadata, increment_retrieval_counts
-from constants import CANDIDATE_POOL_SIZE, SEMANTIC_THRESHOLD
+from constants import CANDIDATE_POOL_SIZE, RETRIEVAL_QUERY_INSTRUCTION
 from rate_limit import api_limit
 from formulas import (
     clamp_impact,
@@ -63,12 +63,16 @@ def store(request: Request, body: MemoryInput):
 def search_memories(text: str, limit: int):
     """Embed text, retrieve and rank candidate memories. Returns a ranked
     list (possibly empty) — shared by /memories/search (raw results, no LLM
-    involved — used for debugging/calibrating ranking, e.g. the
-    SEMANTIC_THRESHOLD tuning in architecture.md) and /generate (feeds the
-    results into the generation prompt). One implementation so ranking logic
-    can't drift between callers — same reasoning as formulas.py. See
-    architecture.md's Controller section."""
-    vector = model.encode(text).tolist()
+    involved — used for debugging/calibrating ranking) and /generate (feeds
+    the results into the generation prompt). One implementation so ranking
+    logic can't drift between callers — same reasoning as formulas.py. See
+    architecture.md's Controller section.
+
+    The query gets RETRIEVAL_QUERY_INSTRUCTION prepended before embedding —
+    stored memory text never does (see store_memory() below, and
+    constants.py for why queries and documents are treated asymmetrically
+    here)."""
+    vector = model.encode(f"{RETRIEVAL_QUERY_INSTRUCTION}{text}").tolist()
     results = qdrant.query_points(
         collection_name=COLLECTION_NAME,
         query=vector,
@@ -78,14 +82,20 @@ def search_memories(text: str, limit: int):
     ids = [str(r.id) for r in results]
     metadata = get_memories_metadata(ids)
 
-    # Normalize semantic scores, then discard anything below the (currently
-    # unvalidated) semantic threshold before it ever reaches ranking — see
-    # constants.py and architecture.md.
+    # No absolute semantic-score cutoff here (deliberately removed — see
+    # architecture.md and security-preventions.md's Resolved section: a
+    # fixed threshold couldn't reliably separate relevant from irrelevant
+    # for this embedding model/dataset — the best real match for a genuine
+    # query sometimes scored lower than real noise did for a nonsense one).
+    # Every candidate in the pool gets ranked; relevance filtering happens
+    # downstream instead — in the model's own judgment for what shows up in
+    # /generate's answer, and in the reinforcement guardrail (a completely
+    # separate, unrelated threshold — see REINFORCEMENT_GUARDRAIL_THRESHOLD
+    # in generate.py) for what's actually allowed to persist to the DB.
     candidates = [
         {"result": r, "semantic": normalize_qdrant_similarity(r.score)}
         for r in results
     ]
-    candidates = [c for c in candidates if c["semantic"] >= SEMANTIC_THRESHOLD]
 
     # Only candidates with a matching Postgres row can be ranked — there's no
     # stability/use_count/last_reinforced_at to compute retrievability or
