@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import "./App.css";
 
 const API_URL = import.meta.env.VITE_API_URL ?? "http://localhost:8000";
@@ -123,6 +123,21 @@ function App() {
   const [analyticsEntries, setAnalyticsEntries] = useState<AnalyticsEntry[]>([]);
   const [openModalIndex, setOpenModalIndex] = useState<number | null>(null);
   const [infoModal, setInfoModal] = useState<InfoModal>(null);
+  const chatHistoryRef = useRef<HTMLDivElement>(null);
+  const analyticsHistoryRef = useRef<HTMLElement>(null);
+
+  // Auto-scroll each panel to its latest entry independently, since a new
+  // answer and its analytics card both arrive at the same time but sit in
+  // two separately-scrolling columns.
+  useEffect(() => {
+    const el = chatHistoryRef.current;
+    if (el) el.scrollTop = el.scrollHeight;
+  }, [messages, loading]);
+
+  useEffect(() => {
+    const el = analyticsHistoryRef.current;
+    if (el) el.scrollTop = el.scrollHeight;
+  }, [analyticsEntries]);
 
   async function sendMessage(e: React.FormEvent) {
     e.preventDefault();
@@ -194,7 +209,7 @@ function App() {
 
       <div id="body">
         <section id="chat-panel">
-          <div id="chat-history">
+          <div id="chat-history" ref={chatHistoryRef}>
             {messages.map((m, i) => (
               <div key={i} className={`message ${m.role}`}>
                 {m.content}
@@ -215,7 +230,7 @@ function App() {
           </form>
         </section>
 
-        <section id="analytics-panel">
+        <section id="analytics-panel" ref={analyticsHistoryRef}>
           <div id="analytics-history">
             {analyticsEntries.map((entry, i) => (
               <div className="analytics-card" key={i}>
