@@ -19,10 +19,9 @@ Every engram is split across two databases, connected by a UUID.
 | `impact` | float | How significant/emotionally weighted this memory is, 0.5–2.0 (clamped server-side regardless of client input), 1.0 = neutral. Set once at creation, used only to seed initial `stability` — deliberately not used again by Decay-Based Forgetting's deletion threshold, which is a flat `MIN_RETRIEVABILITY` independent of `impact`. See `architecture.md`'s "On creation" and Decay-Based Forgetting sections |
 | `stability` | float | Resistance to decay. Seeded from `impact` at creation, multiplied by `REINFORCEMENT_MULTIPLIER` (capped at `MAX_STABILITY`) on each estimated meaningful use. There is no stored "strength"/"retrievability" column — it's computed lazily from `stability` + time elapsed, never written to the DB |
 | `retrieval_count` | int | Number of times this memory has been returned by search (shown, not necessarily used). Bookkeeping only — does not affect ranking or stability |
-| `use_count` | int | Number of times this memory was *meaningfully used* (included in an answer, explicitly selected, referenced later) — distinct from `retrieval_count` to avoid a self-reinforcing popularity loop where mere exposure strengthens a memory. Only this counter drives stability growth and the `frequency` term in ranking |
+| `use_count` | int | Number of answers in which this memory was *estimated to be reflected* — via the reinforcement guardrail's embedding-similarity check (see `architecture.md`'s "How Generation Works"), or a direct `reinforce_memory()` call (e.g. a person explicitly selecting it from search results). Distinct from `retrieval_count` to avoid a self-reinforcing popularity loop where mere exposure strengthens a memory. This is a similarity-based estimate with a measured false-positive rate (see `techDebt.md`), not proof of meaningful use, conscious retrieval, or causal influence on the answer. Only this counter drives stability growth and the `frequency` term in ranking |
 | `created_at` | timestamptz | When the memory was first stored. Plays no role in ranking or decay (that's `last_reinforced_at`'s job) — its one use is feeding `/generate`'s prompt with an accurate, freshly-computed "time ago" marker via `formulas.humanize_age()`, see `architecture.md`'s "How Generation Works" |
-| `last_reinforced_at` | timestamptz | When the memory was last *meaningfully used* — not updated on every retrieval, only on reinforcement |
-| `memory_type` | string | Free-form category label — user-provided via `MemoryInput.memory_type`, defaults to `"young_adult"` there (not the DB schema's own `DEFAULT 'general'`, which only applies to a bare INSERT bypassing the app — see `security-preventions.md`). Not a `Literal`/enum — any string is accepted, since this is a plain descriptive tag with no security or ranking implications, unlike e.g. `Turn.role`. Plays no role in ranking, decay, or the `/generate` prompt — currently write-only, not yet surfaced in any search/generate response. Actual current use: `scripts/seed.py` tags memories `childhood`/`teen`/`young_adult` so `scripts/backdate.sh` can backdate each to a different, life-stage-appropriate age range — see `scripts.md`. |
+| `last_reinforced_at` | timestamptz | Time of the most recent accepted similarity-based reinforcement — not updated on every retrieval, only when a check like the one above passes |
 
 ## How they connect
 
@@ -36,7 +35,6 @@ Qdrant handles semantic search — returns IDs of the most similar vectors. Post
 |-------|-------------|
 | `text` | Memory text to embed and store (required) |
 | `impact` | How significant this memory is, 0.5–2.0 (optional, defaults to 1.0). Clamped server-side regardless of what's sent. Seeds initial `stability` — see `architecture.md` |
-| `memory_type` | Free-form category label (optional, defaults to `"young_adult"`). Not clamped/validated like `impact` — any string is accepted, since it carries no ranking or security weight. Not echoed back in the store response |
 
 **Store response** `POST /memories`
 

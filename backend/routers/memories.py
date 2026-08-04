@@ -18,20 +18,19 @@ from formulas import (
 
 router = APIRouter()
 
-def store_memory(text: str, impact: float, memory_type: str = "young_adult", created_at: datetime = None, last_reinforced_at: datetime = None) -> dict:
+def store_memory(text: str, impact: float, created_at: datetime = None, last_reinforced_at: datetime = None) -> dict:
     """Embed and store a memory in both Qdrant and Postgres. Called by the
     /memories route below. Not currently called anywhere else in-process —
     scripts/seed.py still creates memories via the real HTTP API rather than
     calling this directly (see techDebt.md's Resolved section on why); this
     function's shape is kept ready for any future in-process caller anyway,
     same reasoning as search_memories() below: one implementation so this
-    logic can't drift if a second caller ever does show up. Two different
-    trust levels among the parameters: memory_type IS exposed through
-    MemoryInput/the public route (a plain category label, not
-    security-sensitive) — created_at/last_reinforced_at are NOT and never
-    will be; those stay dev-only backdating hooks with no current caller at
-    all (scripts/backdate.sh backdates via direct SQL instead, not through
-    this function). See dataModel.md and security-preventions.md."""
+    logic can't drift if a second caller ever does show up.
+    created_at/last_reinforced_at are NOT exposed through MemoryInput/the
+    public route and never will be — dev-only backdating hooks with no
+    current in-process caller (scripts/backdate.sh backdates via direct SQL
+    instead, not through this function). See dataModel.md and
+    security-preventions.md."""
     id = str(uuid.uuid4())
     vector = model.encode(text).tolist()
 
@@ -48,7 +47,6 @@ def store_memory(text: str, impact: float, memory_type: str = "young_adult", cre
     # Store metadata in Postgres
     insert_memory(
         id, text, impact, stability,
-        memory_type=memory_type,
         created_at=created_at,
         last_reinforced_at=last_reinforced_at,
     )
@@ -58,7 +56,7 @@ def store_memory(text: str, impact: float, memory_type: str = "young_adult", cre
 @router.post("/memories")
 @api_limit
 def store(request: Request, body: MemoryInput):
-    return store_memory(body.text, body.impact, memory_type=body.memory_type)
+    return store_memory(body.text, body.impact)
 
 def search_memories(text: str, limit: int):
     """Embed text, retrieve and rank candidate memories. Returns a ranked

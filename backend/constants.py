@@ -29,7 +29,11 @@ CANDIDATE_POOL_SIZE = 50  # candidates fetched from Qdrant before re-ranking dow
 # These are prototype defaults, not universal or neuroscientifically
 # derived parameters. Chosen from one hand-built 23-query fixture against
 # one live, reinforcement-skewed database snapshot — re-evaluate against
-# broader, frozen datasets before production. See techDebt.md.
+# broader, frozen datasets before treating these as mature, general
+# defaults. Not a blocker on starting deployment/infra work itself (that
+# doesn't depend on these specific weight values being final) — but it
+# should be resolved before public launch specifically, same category as
+# ADMIN_BYPASS_TOKEN/ENVIRONMENT in prod.md. See techDebt.md.
 SEMANTIC_WEIGHT = 0.95
 RETRIEVABILITY_WEIGHT = 0.00
 FREQUENCY_WEIGHT = 0.05
@@ -121,10 +125,17 @@ RETRIEVAL_CONTEXT_TURNS = 2
 # ("That's a fun childhood memory to have.") scored 0.837 — higher than
 # that genuine citation. Genuine and filler measurably overlap at this fine
 # a grain, so 0.8 is known to let some filler back through in exchange for
-# catching more real citations like the one above — accepted deliberately
-# rather than fixed, since the alternative (a hybrid embedding + literal-
-# word-overlap check) was discussed but not built. See security-preventions.md's
-# Resolved section.
+# catching more real citations like the one above.
+#
+# This threshold alone isn't the only condition anymore, though — see
+# generate.py's guardrail loop and formulas.shares_significant_word(): a
+# memory also has to share a literal word with its best-matching sentence,
+# not just clear this score, since embedding similarity alone was found to
+# false-positive on shared narrative *shape* regardless of actual content
+# (e.g. "tried kombucha, hated it" scoring above 0.8 against an answer
+# about giving up on sushi). That check has its own known, not-fully-closed
+# gap — see techDebt.md. See security-preventions.md's Resolved section for
+# both the threshold's own history and the word-overlap fix's.
 REINFORCEMENT_GUARDRAIL_THRESHOLD = 0.8
 
 # Decay-Based Forgetting

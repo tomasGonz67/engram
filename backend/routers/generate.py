@@ -4,7 +4,7 @@ from models import GenerateInput
 from database import openai_client, model, GENERATION_MODEL, normalize_id
 from routers.memories import search_memories
 from memory_operations import reinforce_memory
-from formulas import humanize_age, normalize_qdrant_similarity, compute_cosine_similarity, split_into_sentences
+from formulas import humanize_age, normalize_qdrant_similarity, compute_cosine_similarity, split_into_sentences, shares_significant_word
 from constants import REINFORCEMENT_GUARDRAIL_THRESHOLD, RETRIEVAL_CONTEXT_TURNS
 from rate_limit import api_limit
 
@@ -32,7 +32,9 @@ SYSTEM_PROMPT = (
     "not having human experiences, or not having a personal life. "
     "Use the retrieved memories below "
     "as your source of truth when they're relevant. If a memory isn't "
-    "actually useful for anything, ignore it."
+    "actually useful for anything, ignore it. Keep answers concise and "
+    "direct — a sentence or two by default. Only go longer when the "
+    "question genuinely needs the detail (e.g. explaining how you work)."
 )
 
 @router.post("/generate")
@@ -93,6 +95,18 @@ def generate(request: Request, body: GenerateInput):
     # passes if its BEST-matching sentence clears the bar, so one relevant
     # sentence in a long answer isn't averaged down by the rest of it. See
     # security-preventions.md's Resolved section.
+    #
+    # Two independent conditions required, not just the embedding threshold
+    # alone: the best-matching sentence must ALSO share a significant word
+    # with the memory (shares_significant_word() in formulas.py). Embedding
+    # similarity alone was confirmed live to false-positive on shared
+    # narrative *shape* regardless of actual subject matter — "Tried
+    # kombucha for the first time and could not get past the taste" scored
+    # above threshold against an answer sentence about giving up on gas
+    # station sushi, sharing zero actual content. See
+    # shares_significant_word()'s docstring and techDebt.md for the full
+    # finding, the fix, and its own known tradeoff (an all-paraphrase
+    # citation with zero literal word overlap would now be missed).
     reinforced_ids = []
     if retrieved and answer:
         sentences = split_into_sentences(answer) or [answer]
@@ -102,11 +116,14 @@ def generate(request: Request, body: GenerateInput):
         # were already batched this way above, memories weren't.
         memory_vectors = model.encode([m["text"] for m in retrieved]).tolist()
         for m, memory_vector in zip(retrieved, memory_vectors):
-            best_similarity = max(
-                normalize_qdrant_similarity(compute_cosine_similarity(sv, memory_vector))
-                for sv in sentence_vectors
-            )
-            if best_similarity >= REINFORCEMENT_GUARDRAIL_THRESHOLD:
+            best_similarity = 0.0
+            best_sentence = sentences[0]
+            for sentence, sv in zip(sentences, sentence_vectors):
+                similarity = normalize_qdrant_similarity(compute_cosine_similarity(sv, memory_vector))
+                if similarity > best_similarity:
+                    best_similarity = similarity
+                    best_sentence = sentence
+            if best_similarity >= REINFORCEMENT_GUARDRAIL_THRESHOLD and shares_significant_word(m["text"], best_sentence):
                 pid = normalize_id(str(m["id"]))
                 reinforce_memory(pid)
                 reinforced_ids.append(pid)

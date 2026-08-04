@@ -82,7 +82,7 @@ const NEUROSCIENCE_TERMS = [
   },
   {
     term: "stability",
-    explanation: "How resistant this memory is to being forgotten. Starts based on how significant it seemed when created, and grows every time it's estimated to have been relied on — like a synapse strengthening from real use, not just being glanced at.",
+    explanation: "How resistant this memory is to being forgotten. Starts based on how significant it seemed when created, and grows every time it's estimated to have been relied on — loosely analogous to use-dependent strengthening, not a model of synapses, plasticity, or neuronal ensembles. The actual mechanism is a scalar multiplied after an embedding-similarity check passes.",
   },
   {
     term: "semantic",
@@ -94,7 +94,7 @@ const NEUROSCIENCE_TERMS = [
   },
   {
     term: "retrievability",
-    explanation: "How \"available\" this memory is right now, based on its stability and how long it's been since it was last used. Fades over time if untouched, modeling the brain's natural forgetting curve.",
+    explanation: "How \"available\" this memory is right now, based on its stability and how long it's been since it was last used. Fades over time if untouched — a modeled accessibility score, not a claim that the brain follows this exact equation. There's no single established \"natural forgetting curve\" in the research either; this is a simplified engineering approximation, loosely inspired by that broader idea.",
   },
   {
     term: "use_count",
@@ -106,7 +106,7 @@ const NEUROSCIENCE_TERMS = [
   },
   {
     term: "final_score",
-    explanation: "The combined ranking score memories are actually sorted by — mostly semantic similarity (95%), with a small contribution from frequency (5%). Retrievability isn't part of this score — it governs when a memory eventually gets forgotten (deleted), not how memories are ranked, after testing showed giving it ranking weight actively hurt relevance. A weighted sum rather than a product, deliberately, so one weak signal (like a brand-new, never-used memory) can't zero out an otherwise strong match.",
+    explanation: "The combined ranking score memories are actually sorted by — mostly semantic similarity (95%), with a small contribution from frequency (5%). Retrievability isn't part of this score — it governs when a memory eventually gets forgotten (permanently deleted from the database), not how memories are ranked, after testing showed giving it ranking weight actively hurt relevance. Permanent deletion is a lossy engineering approximation of forgetting, not a claim about how biological forgetting works — biological forgetting is often a failure to access an otherwise-intact memory trace, not proven erasure of it. A weighted sum rather than a product, deliberately, so one weak signal (like a brand-new, never-used memory) can't zero out an otherwise strong match.",
   },
   {
     term: "reinforcement",

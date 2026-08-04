@@ -46,21 +46,17 @@ CREATE TABLE IF NOT EXISTS memories (
     retrieval_count INT DEFAULT 0,
     use_count INT DEFAULT 0,
     created_at TIMESTAMPTZ DEFAULT NOW(),
-    last_reinforced_at TIMESTAMPTZ DEFAULT NOW(),
-    memory_type VARCHAR(50) DEFAULT 'general'
+    last_reinforced_at TIMESTAMPTZ DEFAULT NOW()
 );
 """
 
-def insert_memory(id: str, text: str, impact: float, stability: float, memory_type: str = "general", created_at: datetime = None, last_reinforced_at: datetime = None):
+def insert_memory(id: str, text: str, impact: float, stability: float, created_at: datetime = None, last_reinforced_at: datetime = None):
     """created_at/last_reinforced_at are dev-only backdating hooks — None
     (the default) means "now" for both, identical to the old DEFAULT NOW()
-    behavior. Only ever passed a real value by scripts/backdate.sh's
-    predecessor use case, now scripts/backdate.sh itself for per-category
-    ranges; never exposed through MemoryInput or the public /memories route.
-    memory_type IS exposed through MemoryInput (defaults to "young_adult"
-    there, "general" here only as a bare-function-call fallback) — a plain
-    category label, not security-sensitive. See dataModel.md and
-    security-preventions.md."""
+    behavior. Only ever passed a real value by scripts/backdate.sh (direct
+    SQL, not through this function) or its predecessor use case; never
+    exposed through MemoryInput or the public /memories route. See
+    dataModel.md and security-preventions.md."""
     id = normalize_id(id)
     now = datetime.now(timezone.utc)
     created_at = created_at or now
@@ -70,8 +66,8 @@ def insert_memory(id: str, text: str, impact: float, stability: float, memory_ty
         with conn:
             with conn.cursor() as cur:
                 cur.execute(
-                    "INSERT INTO memories (id, text, impact, stability, memory_type, created_at, last_reinforced_at) VALUES (%s, %s, %s, %s, %s, %s, %s)",
-                    (id, text, impact, stability, memory_type, created_at, last_reinforced_at)
+                    "INSERT INTO memories (id, text, impact, stability, created_at, last_reinforced_at) VALUES (%s, %s, %s, %s, %s, %s)",
+                    (id, text, impact, stability, created_at, last_reinforced_at)
                 )
     finally:
         conn.close()

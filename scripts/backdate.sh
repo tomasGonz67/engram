@@ -1,16 +1,27 @@
 #!/bin/bash
-# Spreads every memory's created_at/last_reinforced_at across a realistic,
-# life-stage-appropriate range instead of everything looking freshly created
-# right after a seed.py run. Range depends on memory_type:
-#   childhood   -> 20-30 years ago (7300-10950 days)
-#   teen        -> 10-20 years ago (3650-7300 days)
-#   young_adult -> 0-10 years ago  (0-3650 days) — also the fallback for any
-#                  other/unrecognized memory_type value
-# Both timestamp columns get set to the same randomly-generated value per
-# row, matching how a never-reinforced memory's last_reinforced_at already
-# equals its created_at by default (see database.py's insert_memory) — this
-# just moves that shared timestamp back in time instead of leaving it at
-# "now", within whichever range that row's memory_type calls for.
+# Applies each memory's hand-assigned created_at from scripts/seed_data.json
+# — the same canonical dataset scripts/seed.py reads for text/impact. Run
+# this after seed.py. Matches rows by text (not id, since ids are
+# server-generated and change on every reseed — same reasoning
+# evaluation/evaluate_retrieval.py's fixture already relies on).
+#
+# created_at can't be set through the public API at all (see dataModel.md,
+# security-preventions.md) — MemoryInput doesn't expose it, by design, so a
+# real caller can never backdate their own memories. This script bypasses
+# that the same way its predecessor did: direct SQL against Postgres, not
+# through the app.
+#
+# Both created_at and last_reinforced_at get set to the same value per row,
+# matching how a never-reinforced memory naturally has them equal by
+# default (see database.py's insert_memory()).
+#
+# Supersedes the old memory_type-keyed, category-random-range version: each
+# memory now gets an exact, individually-chosen date instead of a random
+# offset within a coarse childhood/teen/young_adult bucket. This also
+# resolves the narrative-ordering gap the old approach had (see
+# techDebt.md) — dates are chosen with real chronological dependencies in
+# mind (e.g. a pet's acquisition predates its death) rather than assigned
+# independently per row.
 #
 # Dev only, same guard as clear.sh. Refuses to run if the ENVIRONMENT value
 # baked into docker-compose-dev.yml resolves to 'production'. The compose
@@ -31,32 +42,38 @@ if [ "$COMPOSE_ENV" = "production" ]; then
     exit 1
 fi
 
-echo "Backdating memories to life-stage-appropriate ages..."
-docker compose -f docker-compose-dev.yml exec -T postgres psql -U engram_user -d engram_db -c "
-UPDATE memories m
-SET created_at = sub.new_time,
-    last_reinforced_at = sub.new_time
-FROM (
-    SELECT
-        id,
-        NOW() - ((min_days + random() * (max_days - min_days)) * INTERVAL '1 day') AS new_time
-    FROM (
-        SELECT
-            id,
-            CASE memory_type
-                WHEN 'childhood' THEN 7300
-                WHEN 'teen' THEN 3650
-                ELSE 0
-            END AS min_days,
-            CASE memory_type
-                WHEN 'childhood' THEN 10950
-                WHEN 'teen' THEN 7300
-                ELSE 3650
-            END AS max_days
-        FROM memories
-    ) ranges
-) sub
-WHERE m.id = sub.id;
-"
+echo "Backdating memories to their hand-assigned created_at from scripts/seed_data.json..."
 
-echo "Done — childhood memories backdated 20-30 years, teen 10-20 years, young_adult (and anything else) 0-10 years."
+# Builds a single UPDATE ... FROM (VALUES ...) statement — one round trip
+# regardless of dataset size, not one UPDATE per memory. Escapes single
+# quotes the standard SQL way (doubling them) since memory text legitimately
+# contains apostrophes (e.g. possessives) — string-building this by hand in
+# bash would be exactly the kind of thing that quietly breaks on real data.
+SQL=$(python3 -c "
+import json
+
+with open('scripts/seed_data.json') as f:
+    memories = json.load(f)
+
+def escape(s):
+    return s.replace(\"'\", \"''\")
+
+values = ',\n    '.join(
+    f\"('{escape(m['text'])}', '{m['created_at']}'::timestamptz)\"
+    for m in memories
+)
+
+print(f'''
+UPDATE memories m
+SET created_at = v.created_at,
+    last_reinforced_at = v.created_at
+FROM (VALUES
+    {values}
+) AS v(text, created_at)
+WHERE m.text = v.text;
+''')
+")
+
+docker compose -f docker-compose-dev.yml exec -T postgres psql -U engram_user -d engram_db -c "$SQL"
+
+echo "Done — created_at/last_reinforced_at applied per memory from scripts/seed_data.json."

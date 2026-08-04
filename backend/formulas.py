@@ -135,6 +135,75 @@ def split_into_sentences(text: str) -> list[str]:
     return sentences
 
 
+# Function words plus a small set of generic, low-information nouns/verbs
+# (time, day, way, thing, moment, life, lot, bit — words common enough to
+# appear in almost any autobiographical sentence regardless of actual
+# subject matter) — see shares_significant_word()'s docstring for why the
+# generic-noun additions are there specifically, not just standard
+# stopwords.
+_GUARDRAIL_STOPWORDS = frozenset("""
+a an the is was were be been being am are i you he she it we they me him her us them
+my your his its our their mine yours hers ours theirs
+and or but if then so because as while although
+to of in on at for with about against between into through during before after above below from
+up down off over under again further once
+this that these those
+do does did doing have has had having
+will would could should can may might must shall
+not no nor yes
+get got getting really just very also still even
+more most some any all both each few other such
+there here when where why how what which who whom
+time times day days year years way ways thing things moment moments life lives lot bit
+""".split()) | frozenset("""
+i've i'm i'd i'll you've you're you'd don't didn't wasn't weren't isn't aren't
+couldn't wouldn't shouldn't it's that's there's he's she's we've they've let's
+can't won't
+""".split())
+
+
+def _significant_words(text: str) -> set[str]:
+    tokens = re.findall(r"[a-z0-9']+", text.lower())
+    return {t for t in tokens if t not in _GUARDRAIL_STOPWORDS and len(t) > 1}
+
+
+def shares_significant_word(memory_text: str, sentence: str) -> bool:
+    """True if the memory text and the answer sentence share at least one
+    word outside a stopword/generic-word list. Used by /generate's
+    reinforcement guardrail as a second, independent condition alongside
+    REINFORCEMENT_GUARDRAIL_THRESHOLD — a memory only gets reinforced if
+    BOTH the embedding similarity clears the threshold AND this returns
+    True, not either alone.
+
+    Exists specifically to catch a failure mode embedding similarity alone
+    doesn't: two sentences can share a narrative *shape* ("tried X, had a
+    bad reaction, gave up on X") with high cosine similarity despite
+    describing completely different things, if X differs. Confirmed live:
+    "Tried kombucha for the first time and could not get past the taste"
+    scored 0.82 (above the 0.8 threshold) against an answer sentence about
+    giving up on gas station sushi — zero shared subject matter, just a
+    shared sentence pattern. Requiring literal word overlap rejects that
+    case (no shared words) while still passing genuine citations, since
+    those reliably share specific words with the answer even under
+    paraphrasing (verified against the parenthetical-clause case in
+    security-preventions.md's Resolved section: "we originally met playing
+    Toontown" shares "Toontown" with its memory) and still reject known
+    filler (verified against the original ~15-phrase calibration set: none
+    of it shares specific words with any real memory, having none to share
+    to begin with).
+
+    Known, accepted limitation, not silently ignored: a genuine citation
+    paraphrased heavily enough to share zero literal words with its memory
+    (e.g. "kombucha" rephrased as "a fermented tea drink") would now be
+    incorrectly rejected — a new false negative traded for fixing the false
+    positive above. Same category of tradeoff as REINFORCEMENT_GUARDRAIL_THRESHOLD
+    itself: accepted because the failure mode it fixes (confidently wrong
+    reinforcement onto an unrelated memory) is worse than the one it risks
+    (an occasional real citation phrased so differently it isn't caught),
+    not because it's free."""
+    return bool(_significant_words(memory_text) & _significant_words(sentence))
+
+
 def compute_final_score(semantic: float, retrievability: float, frequency: float) -> float:
     """Weighted SUM (not product) of the three ranking signals. See
     architecture.md for why a sum is used — a weak signal on one term (e.g.
