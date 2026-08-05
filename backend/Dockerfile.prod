@@ -7,8 +7,14 @@ RUN pip install -r requirements.txt
 
 COPY . .
 
-# No --reload (dev-only, see techDebt.md/prod.md). Binds directly to 443 with
-# a mounted Let's Encrypt cert — no reverse proxy in front, see prod.md's
-# "TLS & Reverse Proxy" section for why.
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "443", \
-     "--ssl-keyfile", "/certs/privkey.pem", "--ssl-certfile", "/certs/fullchain.pem"]
+# No --reload (dev-only, see techDebt.md/prod.md). Binds directly to 443
+# with a mounted Let's Encrypt cert — no reverse proxy in front, see
+# prod.md's "TLS & Reverse Proxy" section for why. Cert paths come from
+# SSL_KEYFILE/SSL_CERTFILE (set in docker-compose.yml) rather than being
+# hardcoded here, since Let's Encrypt's live/ files are relative symlinks
+# into ../../archive/ — mounting just the live/<domain> directory breaks
+# them inside the container, so the whole /etc/letsencrypt tree gets
+# mounted at the same path instead, and the exact live/<domain> path is an
+# env var, not baked into the image. Shell form (not exec-form array) so
+# the env vars actually expand.
+CMD ["sh", "-c", "uvicorn main:app --host 0.0.0.0 --port 443 --ssl-keyfile \"$SSL_KEYFILE\" --ssl-certfile \"$SSL_CERTFILE\""]
