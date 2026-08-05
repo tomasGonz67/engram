@@ -48,7 +48,7 @@ Qdrant handles semantic search — returns IDs of the most similar vectors. Post
 | Field | Description |
 |-------|--------------|
 | `text` | Query text to embed and search against (required) |
-| `limit` | Max number of ranked results to return (optional, defaults to 5, must be >= 1) |
+| `limit` | Requested number of ranked results (optional, defaults to 5, must be >= 1). There is currently no API-level upper bound, but retrieval fetches at most the fixed 50-candidate pool, so values above 50 still return at most 50 results. See `techDebt.md`. |
 
 **Search response** `POST /memories/search` — full weighted ranking is implemented. Fetches a wide candidate pool from Qdrant, normalizes its scores, discards any candidate with no matching Postgres row (can't compute retrievability/frequency without `stability`/`use_count`), computes semantic similarity, retrievability, and frequency for what's left (`final_score`, what ranking actually sorts by, uses only semantic similarity and frequency — retrievability is computed and returned for display but deliberately excluded from ranking, see below), and returns the top `limit` sorted by `final_score` descending — no absolute-score filtering step; see `architecture.md`'s "How Retrieval Works" for why that was removed:
 
@@ -83,7 +83,7 @@ Would become `POST /memories/{id}/use` (a thin route wrapping this same function
 | Field | Description |
 |-------|--------------|
 | `text` | The user's query (required) |
-| `limit` | How many memories `search_memories()` should retrieve (default 5, must be >= 1) |
+| `limit` | Requested number of memories (default 5, must be >= 1). There is currently no API-level upper bound; the fixed candidate pool means at most 50 can be returned. See `techDebt.md`. |
 | `recent_turns` | Caller-supplied short-term conversation context (`{role, content}` list). `role` is `Literal["user", "assistant"]`, not a plain `str` — it used to be unconstrained, which let a caller inject a `"system"`-role message straight into the prompt sent to the model; that's fixed now, see `security-preventions.md`'s Resolved section for the original bug. Masi Memory has no session concept of its own, so the caller tracks and passes this in; see `architecture.md`'s statelessness note. No size limit enforced server-side (still true — see `security-preventions.md`'s "To Add"); the frontend caller currently caps this at the last 20 messages before sending — see `techStack.md`'s "React + Vite (Frontend)" section |
 
 **Generate response** `POST /generate`
