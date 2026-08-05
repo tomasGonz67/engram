@@ -32,12 +32,17 @@ openai_client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 GENERATION_MODEL = os.getenv("GENERATION_MODEL", "gpt-5.4-nano")
 
 def get_pg_conn():
+    # Neon (prod) requires sslmode=require; dev's self-hosted Postgres
+    # container has no SSL configured at all, so "prefer" (negotiate SSL if
+    # offered, otherwise plain) is the safe default that works unchanged for
+    # both without needing an env var set in dev specifically.
     return psycopg2.connect(
         host=os.getenv("POSTGRES_HOST"),
         port=os.getenv("POSTGRES_PORT"),
         dbname=os.getenv("POSTGRES_DB"),
         user=os.getenv("POSTGRES_USER"),
-        password=os.getenv("POSTGRES_PASSWORD")
+        password=os.getenv("POSTGRES_PASSWORD"),
+        sslmode=os.getenv("POSTGRES_SSLMODE", "prefer")
     )
 
 def normalize_id(id: str) -> str:
