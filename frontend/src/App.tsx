@@ -59,9 +59,10 @@ function formatCreatedAt(value: unknown): string {
 const GREETING: Turn = {
   role: "assistant",
   content:
-    "Hi! I'm Masi. I'm built to work like human memory — some memories " +
-    "stick, some fade, and using them again makes them stronger. Ask me " +
-    "about myself or anything from my memories!",
+    "Hi! I'm Masi. I'm an AI/RAG system built to mimic a simplified form " +
+    "of the human memory system. I have the fictional memories stored of " +
+    "a made up character called Masi and his life. Ask me anything about " +
+    "my life!",
 };
 
 const ABOUT_TEXT =
