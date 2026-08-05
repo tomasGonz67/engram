@@ -72,9 +72,9 @@ Adopted weights (`0.95/0.00/0.05`) were re-measured against the same corrected f
 |---|---|---|---|
 | Former production (0.75/0.15/0.10) | 39.1% | 22.1% | 0.341 |
 | Semantic-only (1.00/0.00/0.00) | 100.0% | 82.0% | 0.978 |
-| **Current production (0.95/0.00/0.05)** | **100.0%** | **82.0%** | **1.000** |
+| **Adopted prototype weights (0.95/0.00/0.05)** | **100.0%** | **82.0%** | **1.000** |
 
-Current production ranking ties semantic-only on Recall@5 and beats it on MRR — it does not perform worse than semantic-only search, unlike the former weights this section documents. The MVP-not-neuroscientifically-derived caveat still applies (see `reranking-weight-decision.md`'s Limitations section and `techDebt.md`'s corresponding entry) — this is a measured result on one fixture/dataset, not a claim of universal optimality.
+On the historical 181-memory evaluation, the adopted prototype ranking tied semantic-only on Recall@5 and beat it on MRR; unlike the former weights, it did not perform worse than semantic-only search on that snapshot. The MVP-not-neuroscientifically-derived caveat still applies (see `reranking-weight-decision.md`'s Limitations section and `techDebt.md`'s corresponding entry), and the stale fixture means this is not a current-corpus result.
 
 **What is not established, and shouldn't be claimed**: an earlier evaluation (different query fixture, run against the database at an earlier, less-skewed reinforcement state) reported a considerably higher final-ranking Recall@5 than this harness currently measures. It's tempting to attribute that entire numerical gap to reinforcement accumulating in the meantime — but two things changed between that evaluation and this one: the database's reinforcement state, *and* the query/label fixture itself. With two variables changed at once, the size of the gap can't be attributed to either one alone. Treat the direction (more skew plausibly means worse final-ranking) as a reasonable hypothesis consistent with the controlled evidence above — not as a precisely-quantified before/after measurement, which this comparison isn't.
 
