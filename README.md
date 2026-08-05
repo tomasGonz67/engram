@@ -23,7 +23,7 @@ See `architecture.md` for the full formulas and reasoning behind each principle.
 
 ## Prototype Status
 
-Masi Memory is ready to run as a prototype and demonstration, not as a production-hardened service or validated cognitive model. The current canonical development dataset contains 1,000 synthetic autobiographical memories. Retrieval-weight and threshold experiments in this repository were performed against an earlier 181-memory corpus; they explain the current MVP defaults but have not been revalidated against the 1,000-memory dataset. The stale evaluation fixture and other accepted limitations are documented in `evaluation/README.md`, `techDebt.md`, and `security-preventions.md`.
+Masi Memory is ready to run as a prototype and demonstration, not as a production-hardened service or validated cognitive model. The current canonical development dataset contains 980 synthetic autobiographical memories. Retrieval-weight and threshold experiments in this repository were performed against an earlier 181-memory corpus; they explain the current MVP defaults but have not been revalidated against the 980-memory dataset. The stale evaluation fixture and other accepted limitations are documented in `evaluation/README.md`, `techDebt.md`, and `security-preventions.md`.
 
 ## Frontend
 

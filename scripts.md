@@ -14,7 +14,7 @@ This stops the dev containers, removes both the `postgres_data` and `qdrant_data
 
 ## `scripts/seed_data.json` — the canonical seed dataset
 
-The current file contains 1,000 synthetic autobiographical memories. This is the canonical development corpus; the retrieval fixture under `evaluation/` still targets the former 181-memory corpus and is explicitly marked stale there.
+The current file contains 980 synthetic autobiographical memories. This is the canonical development corpus; the retrieval fixture under `evaluation/` still targets the former 181-memory corpus and is explicitly marked stale there.
 
 A flat JSON array of `{text, impact, created_at}` objects — the single source of truth both `seed.py` and `backdate.sh` read from, so they can never drift apart (one script's `text`/`impact` and the other script's `text`/`created_at` always describe the same memory). `impact` and `created_at` are hand-assigned per memory, not randomly generated: `impact` reflects that specific memory's actual content (a significant event scores higher than a mundane one), and `created_at` reflects a real, internally consistent timeline — causal/narrative dependencies between related memories (e.g. a pet's acquisition predating its death) are respected by construction, not left to chance. This replaces an earlier design where `impact` was randomly rolled per memory and `created_at` was a random offset within a coarse category range (`childhood`/`teen`/`young_adult`) — see `techDebt.md`'s Resolved section (the `backdate.sh`/`memory_type` entries) for the full history and why that changed. No `memory_type` field exists anymore; nothing in the system reads it after this refactor (it never affected ranking, decay, or the prompt to begin with).
 

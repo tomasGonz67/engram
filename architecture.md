@@ -35,7 +35,7 @@ N is intentionally larger than the normal number of results returned. Fetch up t
 
 ---
 
-**Evaluation scope:** every numerical result in the preceding threshold and query-instruction discussion was measured against the former 181-memory development snapshot. The current canonical seed corpus contains 1,000 different memories, and the old fixture is stale against it. These results remain the historical basis for the prototype defaults, not validation of retrieval quality on the current corpus; see `evaluation/README.md`.
+**Evaluation scope:** every numerical result in the preceding threshold and query-instruction discussion was measured against the former 181-memory development snapshot. The current canonical seed corpus contains 980 different memories, and the old fixture is stale against it. These results remain the historical basis for the prototype defaults, not validation of retrieval quality on the current corpus; see `evaluation/README.md`.
 
 ## How Generation Works
 
@@ -129,7 +129,7 @@ Because this permanently deletes data, `delete_decayed_memories()` takes a `dry_
 
 Each memory's retrievability computation is wrapped in its own `try/except ValueError` — a single malformed row (`stability <= 0`; nothing in the schema prevents this, only app-level clamping at write time) is logged and skipped rather than raising uncaught and killing the entire weekly loop for every other memory. See `techDebt.md`'s Resolved section for the failure mode this replaced.
 
-**Threshold-validation scope:** the 181-memory live-data check above predates the current 1,000-memory seed corpus and has not been repeated against it. The calculated lifetimes still follow from the implemented formula, but the percentage of the current dataset that would qualify for deletion is not established. Dry-run remains the required safety step before enabling deletion.
+**Threshold-validation scope:** the 181-memory live-data check above predates the current 980-memory seed corpus and has not been repeated against it. The calculated lifetimes still follow from the implemented formula, but the percentage of the current dataset that would qualify for deletion is not established. Dry-run remains the required safety step before enabling deletion.
 
 **Runs on a weekly `asyncio` loop inside the app, not a manual script or an HTTP route.** Three deliberate choices here:
 

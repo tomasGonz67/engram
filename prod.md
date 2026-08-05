@@ -67,7 +67,7 @@ Not self-hosted in prod — the plan is to move to Neon's free tier (0.5GB stora
 
 Migration is simple: `database.py` already reads all Postgres connection info from environment variables (`POSTGRES_HOST`, `POSTGRES_PORT`, etc.) — pointing at Neon instead of the local `postgres` container is just swapping those env var values, no code changes needed.
 
-At Masi Memory's realistic scale (currently 1,000 canonical development-memory rows, with each metadata row still small), 500MB leaves ample room for growth and is not a meaningful constraint for this prototype.
+At Masi Memory's realistic scale (currently 980 canonical development-memory rows, with each metadata row still small), 500MB leaves ample room for growth and is not a meaningful constraint for this prototype.
 
 Neon's scale-to-zero means a brief cold-start delay on the first query after a period of inactivity — a non-issue given Masi Memory's actual latency requirements (personal, sporadic usage, not a real-time system).
 
@@ -77,7 +77,7 @@ Neon's scale-to-zero means a brief cold-start delay on the first query after a p
 
 Not self-hosted in prod — the plan is to move to Qdrant Cloud's free tier (0.5 vCPU, 1GB RAM, 4GB disk, $0 permanently; not yet migrated — see "Architecture Overview"'s status note above). This was actually the original plan from `techStack.md`'s own initial reasoning ("self-hostable with Docker locally, managed cloud for production... free tier covers this project"), written before any of this session's work — this decision just confirms and acts on it.
 
-**RAM, not disk, is the binding constraint** for a vector DB specifically — search performance depends on keeping the HNSW index resident in memory, unlike a relational DB, which can page rows in from disk on demand for typical indexed lookups. At ~10-15KB/vector (1024-dim, current) this free tier holds roughly 70-100k vectors; at ~4096-dim (`Qwen3-Embedding-8B`, once that migration happens) roughly 25k. Either way, that remains well above the current 1,000-memory development corpus.
+**RAM, not disk, is the binding constraint** for a vector DB specifically — search performance depends on keeping the HNSW index resident in memory, unlike a relational DB, which can page rows in from disk on demand for typical indexed lookups. At ~10-15KB/vector (1024-dim, current) this free tier holds roughly 70-100k vectors; at ~4096-dim (`Qwen3-Embedding-8B`, once that migration happens) roughly 25k. Either way, that remains well above the current 980-memory development corpus.
 
 Requires an API key for access — unlike the current self-hosted Qdrant, which has no auth at all since it only lives on the private Docker network today. One more secret to manage, same pattern as `OPENAI_API_KEY` (env var, gitignored `.env`, never hardcoded in a committed compose file).
 

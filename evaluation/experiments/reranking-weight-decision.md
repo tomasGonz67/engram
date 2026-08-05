@@ -6,7 +6,7 @@ Authoritative record for the `SEMANTIC_WEIGHT`/`RETRIEVABILITY_WEIGHT`/`FREQUENC
 
 **MVP decision, evidence-backed, not neuroscientifically optimal or universally validated.** Chosen from a hand-built 23-query fixture against one live database snapshot (this session's reinforcement-skewed dev data). Re-evaluate on a broader, frozen dataset before treating these as final — see `techDebt.md`'s corresponding entry.
 
-**Also now stale in a second way**: that 23-query fixture (`evaluation/retrieval_cases.json`) was written against the former ~181-memory corpus. The seed dataset has since been fully rewritten to 1,000 memories with entirely different content, so none of this fixture's labels resolve against the current data — see `evaluation/README.md`'s Fixture section and `techDebt.md`. The results below remain valid evidence for *why* `0.95/0.00/0.05` beat the former weights on the corpus that existed at the time; they are not a current-state claim about the live 1,000-memory dataset.
+**Also now stale in a second way**: that 23-query fixture (`evaluation/retrieval_cases.json`) was written against the former ~181-memory corpus. The seed dataset has since been fully rewritten to 980 memories with entirely different content, so none of this fixture's labels resolve against the current data — see `evaluation/README.md`'s Fixture section and `techDebt.md`. The results below remain valid evidence for *why* `0.95/0.00/0.05` beat the former weights on the corpus that existed at the time; they are not a current-state claim about the live 980-memory dataset.
 
 ## Hypothesis
 
