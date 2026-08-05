@@ -1,6 +1,6 @@
 # Masi Memory
 
-A biologically inspired memory system for AI. A simplified model of human memory incorporating principles from cognitive science such as decay, reinforcement, and forgetting, translated into practical algorithms for long-term AI memory.
+A biologically inspired memory system for AI. It applies simplified engineering analogies to cognitive principles such as decay, reinforcement, and forgetting to create a practical long-term RAG memory layer; it is not a simulation of biological memory.
 
 ## What is an engram?
 
@@ -20,6 +20,10 @@ Masi Memory is not intended to simulate the brain exactly. Instead, it adapts we
 - **Weighted Retrieval** — memory ranking combines semantic similarity and how often a memory has been reinforced through estimated meaningful use. Retrievability is deliberately not part of ranking — testing showed it displaced genuinely relevant memories — but still governs Decay-Based Forgetting
 
 See `architecture.md` for the full formulas and reasoning behind each principle.
+
+## Prototype Status
+
+Masi Memory is ready to run as a prototype and demonstration, not as a production-hardened service or validated cognitive model. The current canonical development dataset contains 1,000 synthetic autobiographical memories. Retrieval-weight and threshold experiments in this repository were performed against an earlier 181-memory corpus; they explain the current MVP defaults but have not been revalidated against the 1,000-memory dataset. The stale evaluation fixture and other accepted limitations are documented in `evaluation/README.md`, `techDebt.md`, and `security-preventions.md`.
 
 ## Frontend
 
