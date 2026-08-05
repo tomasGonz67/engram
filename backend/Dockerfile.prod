@@ -1,0 +1,14 @@
+FROM python:3.11-slim
+
+WORKDIR /app
+
+COPY requirements.prod.txt requirements.txt
+RUN pip install -r requirements.txt
+
+COPY . .
+
+# No --reload (dev-only, see techDebt.md/prod.md). Binds directly to 443 with
+# a mounted Let's Encrypt cert — no reverse proxy in front, see prod.md's
+# "TLS & Reverse Proxy" section for why.
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "443", \
+     "--ssl-keyfile", "/certs/privkey.pem", "--ssl-certfile", "/certs/fullchain.pem"]
