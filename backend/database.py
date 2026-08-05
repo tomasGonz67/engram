@@ -2,14 +2,55 @@ import os
 import uuid
 from datetime import datetime, timezone
 import psycopg2
-from sentence_transformers import SentenceTransformer
 from qdrant_client import QdrantClient
 from openai import OpenAI
 
 COLLECTION_NAME = "memories"
-VECTOR_SIZE = 1024
 
-model = SentenceTransformer(os.getenv("EMBEDDING_MODEL", "Qwen/Qwen3-Embedding-0.6B"))
+
+class _OpenRouterEmbedder:
+    """Drop-in replacement for SentenceTransformer's .encode() interface,
+    calling OpenRouter's embeddings endpoint (OpenAI-compatible) instead of
+    running a model locally — used in prod, where the droplet has nowhere
+    near enough RAM to self-host an embedding model (confirmed live: ~458MB
+    total). Returns numpy arrays, matching SentenceTransformer's actual
+    return type, so every existing call site's .tolist() (memories.py,
+    generate.py) keeps working completely unchanged — this class is the
+    only thing that needs to know embeddings now come from an API call."""
+
+    def __init__(self, api_key: str, model_name: str):
+        self._client = OpenAI(api_key=api_key, base_url="https://openrouter.ai/api/v1")
+        self._model_name = model_name
+
+    def encode(self, text):
+        import numpy as np
+        single = isinstance(text, str)
+        inputs = [text] if single else list(text)
+        response = self._client.embeddings.create(model=self._model_name, input=inputs)
+        vectors = [d.embedding for d in response.data]
+        return np.array(vectors[0]) if single else np.array(vectors)
+
+
+# Dev: self-hosted SentenceTransformer (Qwen3-Embedding-0.6B, 1024 dims).
+# Prod: OpenRouter API (Qwen3-Embedding-8B, 4096 dims) — gated on
+# OPENROUTER_API_KEY rather than ENVIRONMENT directly, matching the same
+# pattern used for the Qdrant client below. sentence_transformers is only
+# imported in the dev branch, since requirements.prod.txt deliberately
+# excludes it (and torch) to keep the prod image light — importing it
+# unconditionally would crash prod on startup before this check even ran.
+# VECTOR_SIZE has to track which model is active: creating a Qdrant
+# collection with the wrong dimension for the vectors actually being
+# inserted fails outright, not silently.
+if os.getenv("OPENROUTER_API_KEY"):
+    model = _OpenRouterEmbedder(
+        api_key=os.getenv("OPENROUTER_API_KEY"),
+        model_name=os.getenv("EMBEDDING_MODEL", "qwen/qwen3-embedding-8b"),
+    )
+    VECTOR_SIZE = 4096
+else:
+    from sentence_transformers import SentenceTransformer
+    model = SentenceTransformer(os.getenv("EMBEDDING_MODEL", "Qwen/Qwen3-Embedding-0.6B"))
+    VECTOR_SIZE = 1024
 
 # Dev: self-hosted Qdrant on the private Docker network, no auth, plain HTTP
 # (QDRANT_HOST/QDRANT_PORT). Prod: Qdrant Cloud, which requires HTTPS + an

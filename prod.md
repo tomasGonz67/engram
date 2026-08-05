@@ -59,6 +59,8 @@ Whichever compose file or deployment config ends up building this image for prod
 
 **Prerequisite, done**: rate limiting on `store`/`search` — both become tied to an external API bill once this migration ships, and Masi Memory has no auth to gate them. See `security-preventions.md`'s Resolved section.
 
+**Status: code done, account/key not yet set up.** `database.py`'s `_OpenRouterEmbedder` mirrors `SentenceTransformer`'s `.encode()` interface (returns the same numpy array shape, so every existing call site works unchanged), gated on `OPENROUTER_API_KEY` being set rather than on `ENVIRONMENT` directly — dev keeps self-hosting unless that var is present. `VECTOR_SIZE` now tracks which branch is active (1024/4096) automatically, so the collection gets created at the right dimension from the start. Verified by building the actual prod image and importing the module inside it with the real prod env var shape (dummy key values, no live API call needed to prove the import graph and branch selection are correct) — confirmed it selects `_OpenRouterEmbedder`, `VECTOR_SIZE=4096`, and never imports `sentence_transformers` at all (not installed in the prod image, would otherwise crash on startup). The "requires re-embedding every stored memory" consequence above doesn't apply to this specific deployment — the Qdrant Cloud collection doesn't exist yet, so it gets created at 4096 dimensions from scratch, not migrated from an existing 1024-dim one. Still needed: the actual OpenRouter account and API key.
+
 ---
 
 ## Postgres — Neon (managed)

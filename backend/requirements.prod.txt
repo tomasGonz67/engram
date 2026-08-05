@@ -4,3 +4,4 @@ qdrant-client
 psycopg2-binary
 openai
 slowapi
+numpy
