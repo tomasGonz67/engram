@@ -16,7 +16,7 @@ Vector database. Stores and searches memory vectors by semantic similarity. Acts
 ---
 
 ## PostgreSQL
-Relational database. Stores all engram metadata — `impact`, `stability`, `retrieval_count`/`use_count`, timestamps, memory type. There is no stored "strength" column; retrievability is computed lazily from `stability` and elapsed time, never written to the DB — see `architecture.md`. Acts as the other half of every engram — Qdrant holds the meaning, Postgres holds the details. Together they form one complete memory.
+Relational database. Stores all engram metadata — `impact`, `stability`, `retrieval_count`/`use_count`, timestamps. There is no stored "strength" column; retrievability is computed lazily from `stability` and elapsed time, never written to the DB — see `architecture.md`. Acts as the other half of every engram — Qdrant holds the meaning, Postgres holds the details. Together they form one complete memory.
 
 **Why Postgres:**
 - Schema is fixed — every engram has the same fields, no flexibility needed
