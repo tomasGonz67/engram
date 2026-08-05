@@ -56,6 +56,14 @@ function formatCreatedAt(value: unknown): string {
   });
 }
 
+const GREETING: Turn = {
+  role: "assistant",
+  content:
+    "Hi! I'm Masi. I'm built to work like human memory — some memories " +
+    "stick, some fade, and using them again makes them stronger. Ask me " +
+    "about myself or anything from my memories!",
+};
+
 const ABOUT_TEXT =
   "Masi Memory is a biologically inspired memory system for AI — a simplified " +
   "model of human memory that incorporates real cognitive science " +
@@ -117,7 +125,7 @@ const NEUROSCIENCE_TERMS = [
 type InfoModal = "about" | "formulas" | "neuroscience" | null;
 
 function App() {
-  const [messages, setMessages] = useState<Turn[]>([]);
+  const [messages, setMessages] = useState<Turn[]>([GREETING]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [analyticsEntries, setAnalyticsEntries] = useState<AnalyticsEntry[]>([]);
