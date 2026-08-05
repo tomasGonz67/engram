@@ -11,10 +11,22 @@ VECTOR_SIZE = 1024
 
 model = SentenceTransformer(os.getenv("EMBEDDING_MODEL", "Qwen/Qwen3-Embedding-0.6B"))
 
-qdrant = QdrantClient(
-    host=os.getenv("QDRANT_HOST"),
-    port=int(os.getenv("QDRANT_PORT"))
-)
+# Dev: self-hosted Qdrant on the private Docker network, no auth, plain HTTP
+# (QDRANT_HOST/QDRANT_PORT). Prod: Qdrant Cloud, which requires HTTPS + an
+# API key — QdrantClient(host=, port=) has no way to express either, so
+# Qdrant Cloud is selected via QDRANT_URL instead (its full https:// URL,
+# as given in the Qdrant Cloud dashboard), gated on whether that var is set
+# rather than on ENVIRONMENT directly, so dev keeps working unchanged.
+if os.getenv("QDRANT_URL"):
+    qdrant = QdrantClient(
+        url=os.getenv("QDRANT_URL"),
+        api_key=os.getenv("QDRANT_API_KEY"),
+    )
+else:
+    qdrant = QdrantClient(
+        host=os.getenv("QDRANT_HOST"),
+        port=int(os.getenv("QDRANT_PORT"))
+    )
 
 openai_client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 GENERATION_MODEL = os.getenv("GENERATION_MODEL", "gpt-5.4-nano")
