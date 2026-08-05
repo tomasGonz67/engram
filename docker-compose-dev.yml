@@ -1,7 +1,7 @@
 services:
   backend:
     build: ./backend
-    image: engram-be:dev
+    image: masi-memory-be:dev
     ports:
       - "8000:8000"
     volumes:
@@ -13,9 +13,9 @@ services:
       QDRANT_PORT: 6333
       POSTGRES_HOST: postgres
       POSTGRES_PORT: 5432
-      POSTGRES_USER: engram_user
-      POSTGRES_PASSWORD: engram_pass
-      POSTGRES_DB: engram_db
+      POSTGRES_USER: masi_memory_user
+      POSTGRES_PASSWORD: masi_memory_pass
+      POSTGRES_DB: masi_memory_db
       OPENAI_API_KEY: ${OPENAI_API_KEY}
       ADMIN_BYPASS_TOKEN: ${ADMIN_BYPASS_TOKEN}
     depends_on:
@@ -32,9 +32,9 @@ services:
   postgres:
     image: postgres:15
     environment:
-      POSTGRES_USER: engram_user
-      POSTGRES_PASSWORD: engram_pass
-      POSTGRES_DB: engram_db
+      POSTGRES_USER: masi_memory_user
+      POSTGRES_PASSWORD: masi_memory_pass
+      POSTGRES_DB: masi_memory_db
     ports:
       - "5432:5432"
     volumes:

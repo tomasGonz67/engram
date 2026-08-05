@@ -26,7 +26,7 @@ echo "Stopping dev containers..."
 docker compose -f docker-compose-dev.yml down
 
 echo "Removing Postgres and Qdrant volumes..."
-docker volume rm engram_postgres_data engram_qdrant_data 2>/dev/null || true
+docker volume rm masi-memory_postgres_data masi-memory_qdrant_data 2>/dev/null || true
 
 echo "Starting dev environment fresh..."
 docker compose -f docker-compose-dev.yml up -d

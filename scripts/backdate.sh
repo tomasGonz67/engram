@@ -74,6 +74,6 @@ WHERE m.text = v.text;
 ''')
 ")
 
-docker compose -f docker-compose-dev.yml exec -T postgres psql -U engram_user -d engram_db -c "$SQL"
+docker compose -f docker-compose-dev.yml exec -T postgres psql -U masi_memory_user -d masi_memory_db -c "$SQL"
 
 echo "Done — created_at/last_reinforced_at applied per memory from scripts/seed_data.json."
