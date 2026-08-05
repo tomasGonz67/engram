@@ -8,6 +8,9 @@ Usage:
     python3 scripts/seed.py
 
 Requires the dev environment to already be running (see DEVELOPMENT.md).
+Targets http://localhost:8000 by default; override with SEED_API_URL to
+seed a different deployment instead (e.g. a real prod droplet) — same
+ADMIN_BYPASS_TOKEN handling either way.
 
 Reads scripts/seed_data.json — a flat list of {text, impact, created_at}
 objects, the single canonical dataset also used by scripts/backdate.sh
@@ -35,7 +38,7 @@ import urllib.error
 import urllib.request
 from pathlib import Path
 
-API_URL = "http://localhost:8000/memories"
+API_URL = os.getenv("SEED_API_URL", "http://localhost:8000") + "/memories"
 SEED_DATA_PATH = Path(__file__).resolve().parent / "seed_data.json"
 
 def _load_admin_bypass_token():
