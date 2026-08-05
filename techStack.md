@@ -97,9 +97,11 @@ Single-page chat interface in `frontend/`. Calls `/generate` directly — no ser
 - No SEO needs — a personal chat tool, not public marketing content
 - No server-side rendering needs — just a UI hitting an existing API
 - No Route Handlers needed — all backend logic already lives in the separate FastAPI backend; the frontend only ever calls it
-- Builds to pure static files with no framework-specific adapter needed for Cloudflare Pages (see `prod.md`) — Next.js would've needed `@cloudflare/next-on-pages`, which has real compatibility gaps (e.g. `firebase-admin` doesn't work on Cloudflare Workers at all)
+- Builds to pure static files with no framework-specific adapter needed for Cloudflare (see `prod.md`) — Next.js would've needed `@cloudflare/next-on-pages`, which has real compatibility gaps (e.g. `firebase-admin` doesn't work on Cloudflare Workers at all)
 
-**CORS**: the backend's `CORSMiddleware` (see `security-preventions.md`) is what makes cross-origin calls from the frontend possible at all — configurable via `ALLOWED_ORIGINS`, defaults to the Vite dev server (`http://localhost:5173`).
+**Deployed**: `https://masi-memory.thomasgonz67.workers.dev`, via Cloudflare Workers' static-assets flow (Git-connected, auto-deploys on every push to `main`) — see `prod.md`'s Frontend section for the full account, including why this ended up on Workers rather than the originally-planned Cloudflare Pages.
+
+**CORS**: the backend's `CORSMiddleware` (see `security-preventions.md`) is what makes cross-origin calls from the frontend possible at all — configurable via `ALLOWED_ORIGINS`, defaults to the Vite dev server (`http://localhost:5173`) in dev, set to the real deployed frontend origin in prod (see `prod.md`).
 
 **Sliding window for `recent_turns`**: the frontend caps what it sends to `/generate` at the last 20 messages (`RECENT_TURNS_LIMIT` in `App.tsx`), not the full conversation history. Not primarily a cost decision — at this project's usage scale a full 20-message conversation costs about $0.0015, negligible either way. The real reasons: avoiding "lost in the middle" quality degradation on unusually long conversations, and staying nowhere near GPT-5.4 Nano's 400K token context ceiling. 20 was chosen because it roughly matches typical conversation length, so it rarely triggers for normal use — it's a ceiling for the runaway case, not a constraint on typical usage.
 
